@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TinyBao - Swipe Me!</title>
+    <style>
+        /* CSS code remains unchanged */
+        /* Assume all your original CSS here */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🥟 TinyBao 🥟</h1>
+        <div class="instruction">Start dragging me to hear me talk! 🎵</div>
+        <div class="bao-container" id="baoContainer">
+            <div class="speech-bubble" id="speechBubble">Drag me around to hear me talk! 🎵</div>
+            <div class="bao" id="bao">
+                <div class="face">
+                    <div class="eyes">
+                        <div class="eye"></div>
+                        <div class="eye"></div>
+                    </div>
+                    <div class="mouth" id="mouth"></div>
+                </div>
+            </div>
+        </div>
+        <div class="tap-instruction">Try swiping in different directions! 👆</div>
+        <div class="desktop-hint">On desktop: Click and drag me around! 🖱️</div>
+    </div>
+
+    <script>
+        const bao = document.getElementById('bao');
+        const baoContainer = document.getElementById('baoContainer');
+        const speechBubble = document.getElementById('speechBubble');
+        const mouth = document.getElementById('mouth');
+
+        let isInitialTap = true;
+        let isSwipeActive = false;
+        let swipeTimeout;
+        let currentWordIndex = 0;
+        let speechSynth = window.speechSynthesis;
+        let currentUtterance = null;
+        let isSpeaking = false;
+        let allWords = [];
+        let dragStartX = 0;
+        let dragStartY = 0;
+
+        const poems = [
+            ["I'm a little bao so round and sweet!", "Filled with joy that can't be beat!", "Steam me up and watch me shine!", "In your heart, I'll always dine!"],
+            ["Swipe me left, swipe me right!", "I'm your fluffy friend of light!", "Doughy dreams and tasty treats!", "Life is good when friendship meets!"],
+            ["Round and soft like morning clouds!", "My happiness sings clear and loud!", "Every swipe's a gentle hug!", "You're my favorite little bug!"],
+            ["In the kitchen I was born!", "Now I brighten up your morn!", "Swipe and play, let's dance around!", "Joy and laughter can be found!"]
+        ];
+
+        const poemsWithEmoji = [
+            ["I'm a little bao so round and sweet! 🥟", "Filled with joy that can't be beat! ✨", "Steam me up and watch me shine! 💫", "In your heart, I'll always dine! 💖"],
+            ["Swipe me left, swipe me right! 👈👉", "I'm your fluffy friend of light! ⭐", "Doughy dreams and tasty treats! 🌟", "Life is good when friendship meets! 🤗"],
+            ["Round and soft like morning clouds! ☁️", "My happiness sings clear and loud! 🎵", "Every swipe's a gentle hug! 🤗", "You're my favorite little bug! 🐛❤️"],
+            ["In the kitchen I was born! 👨‍🍳", "Now I brighten up your morn! 🌅", "Swipe and play, let's dance around! 💃", "Joy and laughter can be found! 😄"]
+        ];
+
+        function initializeWords() {
+            allWords = [];
+            for (let poemIndex = 0; poemIndex < poems.length; poemIndex++) {
+                for (let lineIndex = 0; lineIndex < poems[poemIndex].length; lineIndex++) {
+                    const words = poems[poemIndex][lineIndex].split(' ');
+                    for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
+                        allWords.push({
+                            word: words[wordIndex],
+                            poemIndex: poemIndex,
+                            lineIndex: lineIndex,
+                            wordIndex: wordIndex,
+                            displayText: poemsWithEmoji[poemIndex][lineIndex]
+                        });
+                    }
+                }
+            }
+        }
+
+        initializeWords();
+
+        baoContainer.addEventListener('click', function (e) {
+            if (isInitialTap && !isDragging) {
+                speechBubble.classList.add('visible');
+                const invitation = new SpeechSynthesisUtterance("Drag me around to hear me talk!");
+                setupCuteVoice(invitation);
+                speechSynth.speak(invitation);
+
+                setTimeout(() => {
+                    speechBubble.classList.remove('visible');
+                }, 3000);
+            }
+        });
+
+        let startX = 0, startY = 0;
+        let isDragging = false;
+
+        baoContainer.addEventListener('touchstart', function (e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            dragStartX = touch.clientX;
+            dragStartY = touch.clientY;
+            isDragging = true;
+            startSwipe();
+        });
+
+        baoContainer.addEventListener('touchmove', function (e) {
+            e.preventDefault();
+            if (isDragging) {
+                const touch = e.touches[0];
+                updateBaoPosition(touch.clientX, touch.clientY);
+            }
+        });
+
+        baoContainer.addEventListener('touchend', function (e) {
+            e.preventDefault();
+            isDragging = false;
+            endSwipe();
+        });
+
+        baoContainer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            startX = e.clientX;
+            startY = e.clientY;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            isDragging = true;
+            startSwipe();
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (isDragging) {
+                updateBaoPosition(e.clientX, e.clientY);
+            }
+        });
+
+        document.addEventListener('mouseup', function (e) {
+            if (isDragging) {
+                isDragging = false;
+                endSwipe();
+            }
+        });
+
+        function setupCuteVoice(utterance) {
+            utterance.rate = 0.7;
+            utterance.pitch = 1.8;
+            utterance.volume = 0.9;
+        }
+
+        function updateBaoPosition(currentX, currentY) {
+            const deltaX = (currentX - dragStartX) * 0.3;
+            const deltaY = (currentY - dragStartY) * 0.3;
+            bao.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.05)`;
+        }
+
+        function resetBaoPosition() {
+            bao.style.transform = '';
+        }
+
+        function startSwipe() {
+            isInitialTap = false;
+            isSwipeActive = true;
+            bao.classList.add('talking');
+            speakFromCurrentWord();
+        }
+
+        function endSwipe() {
+            isSwipeActive = false;
+            bao.classList.remove('talking');
+            speechBubble.classList.remove('visible');
+            mouth.classList.remove('open');
+            stopSpeaking();
+            resetBaoPosition();
+            clearTimeout(swipeTimeout);
+        }
+
+        function speakFromCurrentWord() {
+            if (isSpeaking || !isSwipeActive || currentWordIndex >= allWords.length) return;
+
+            const currentWordData = allWords[currentWordIndex];
+            speechBubble.textContent = currentWordData.displayText;
+            speechBubble.classList.add('visible');
+
+            const currentLineWords = [];
+            let tempIndex = currentWordIndex;
+            const currentLineIndex = currentWordData.lineIndex;
+            const currentPoemIndex = currentWordData.poemIndex;
+
+            while (tempIndex < allWords.length && allWords[tempIndex].lineIndex === currentLineIndex && allWords[tempIndex].poemIndex === currentPoemIndex) {
+                currentLineWords.push(allWords[tempIndex].word);
+                tempIndex++;
+            }
+
+            if (currentLineWords.length === 0) {
+                currentWordIndex++;
+                if (isSwipeActive) speakFromCurrentWord();
+                return;
+            }
+
+            const textToSpeak = currentLineWords.join(' ');
+            currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
+            setupCuteVoice(currentUtterance);
+
+            isSpeaking = true;
+
+            currentUtterance.onend = () => {
+                isSpeaking = false;
+                mouth.classList.remove('open');
+                if (isSwipeActive) {
+                    swipeTimeout = setTimeout(() => speakFromCurrentWord(), 500);
+                }
+            };
+
+            speechSynth.speak(currentUtterance);
+            mouth.classList.add('open');
+            currentWordIndex += currentLineWords.length;
+        }
+
+        function stopSpeaking() {
+            if (speechSynth.speaking) {
+                speechSynth.cancel();
+            }
+            isSpeaking = false;
+        }
+    </script>
+</body>
+</html>

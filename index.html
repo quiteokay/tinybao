@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="icon" type="image/png" href="/lilbao_351.png">
   <meta name="apple-mobile-web-app-title" content="tiny bao">
   <link rel="apple-touch-icon" href="/lilbao_351.png">
   <meta charset="UTF-8" />
@@ -19,8 +20,19 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: #70D4F1;
+            background: linear-gradient(135deg, #70D4F1 0%, #87CEEB 50%, #98E4FF 100%);
             padding: 40px 20px 20px 20px;
+            overflow: hidden;
+        }
+        
+        .bao-container {
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .bao-container:hover {
+            transform: scale(1.05);
         }
         
         img {
@@ -28,10 +40,354 @@
             max-width: 400px;
             height: auto;
             display: block;
+            animation: float 3s ease-in-out infinite;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
+            transition: all 0.3s ease;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px) rotate(0deg);
+            }
+            50% {
+                transform: translateY(-15px) rotate(1deg);
+            }
+        }
+        
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0px) scale(1) rotate(0deg);
+            }
+            25% {
+                transform: translateY(-20px) scale(1.1) rotate(-2deg);
+            }
+            50% {
+                transform: translateY(-30px) scale(1.15) rotate(0deg);
+            }
+            75% {
+                transform: translateY(-10px) scale(1.05) rotate(2deg);
+            }
+        }
+        
+        @keyframes wiggle {
+            0%, 100% {
+                transform: rotate(0deg);
+            }
+            25% {
+                transform: rotate(-3deg) scale(1.02);
+            }
+            75% {
+                transform: rotate(3deg) scale(1.02);
+            }
+        }
+        
+        @keyframes sparkle {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(0) rotate(0deg);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1) rotate(180deg);
+            }
+        }
+        
+        .bao-container.clicked img {
+            animation: bounce 0.8s ease-out;
+        }
+        
+        .bao-container.wiggling img {
+            animation: wiggle 0.5s ease-in-out;
+        }
+        
+        .sparkles {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+        }
+        
+        .sparkle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #FFD700 0%, #FFA500 100%);
+            border-radius: 50%;
+            opacity: 0;
+            animation: sparkle 1s ease-out;
+        }
+        
+        .sparkle:nth-child(1) {
+            top: -40px;
+            left: -30px;
+            animation-delay: 0s;
+        }
+        
+        .sparkle:nth-child(2) {
+            top: -30px;
+            right: -40px;
+            animation-delay: 0.1s;
+        }
+        
+        .sparkle:nth-child(3) {
+            bottom: -35px;
+            left: -25px;
+            animation-delay: 0.2s;
+        }
+        
+        .sparkle:nth-child(4) {
+            bottom: -40px;
+            right: -30px;
+            animation-delay: 0.15s;
+        }
+        
+        .sparkle:nth-child(5) {
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation-delay: 0.05s;
+        }
+        
+        .hearts {
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+        
+        .heart {
+            position: absolute;
+            font-size: 24px;
+            color: #FF69B4;
+            opacity: 0;
+            animation: floatHeart 2s ease-out;
+        }
+        
+        @keyframes floatHeart {
+            0% {
+                opacity: 1;
+                transform: translateY(0px) scale(0.5);
+            }
+            50% {
+                opacity: 0.8;
+                transform: translateY(-40px) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-80px) scale(0.5);
+            }
+        }
+        
+        .heart:nth-child(1) {
+            left: -20px;
+            animation-delay: 0s;
+        }
+        
+        .heart:nth-child(2) {
+            left: 0px;
+            animation-delay: 0.3s;
+        }
+        
+        .heart:nth-child(3) {
+            left: 20px;
+            animation-delay: 0.6s;
+        }
+        
+        .message {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-size: 14px;
+            color: #333;
+            border: 2px solid #FFB6C1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            white-space: nowrap;
+            display: none;
+        }
+        
+        @keyframes showMessage {
+            0%, 100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(10px) scale(0.8);
+            }
+            20%, 80% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0px) scale(1);
+            }
+        }
+        
+        .message::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid #FFB6C1;
+        }
+        
+        .background-hearts {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .bg-heart {
+            position: absolute;
+            font-size: 20px;
+            color: rgba(255, 192, 203, 0.3);
+            animation: floatBgHeart 8s linear infinite;
+        }
+        
+        @keyframes floatBgHeart {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) rotate(360deg);
+                opacity: 0;
+            }
         }
     </style>
 </head>
 <body>
-    <img src="lilbao_nobg.png" alt="tiny bao">
+    <div class="background-hearts" id="backgroundHearts"></div>
+    
+    <div class="bao-container" id="baoContainer">
+        <img src="lilbao_nobg.png" alt="tiny bao" id="baoImg">
+        <div class="sparkles" id="sparkles"></div>
+        <div class="hearts" id="hearts"></div>
+        <div class="message" id="message"></div>
+    </div>
+
+    <script>
+        const baoContainer = document.getElementById('baoContainer');
+        const baoImg = document.getElementById('baoImg');
+        const sparkles = document.getElementById('sparkles');
+        const hearts = document.getElementById('hearts');
+        const message = document.getElementById('message');
+        const backgroundHearts = document.getElementById('backgroundHearts');
+        
+        const cuteMessages = [
+            "（＾◡＾）♡",
+            "bao bao! ♡",
+            "so squishy~",
+            "uwu ♡",
+            "nom nom ♡",
+            "fluffy bao! ♡",
+            "steamy & cute ♡",
+            "ready to eat! ♡"
+        ];
+        
+        let clickCount = 0;
+        
+        // Create background floating hearts
+        function createBackgroundHeart() {
+            const heart = document.createElement('div');
+            heart.className = 'bg-heart';
+            heart.innerHTML = '♡';
+            heart.style.left = Math.random() * 100 + '%';
+            heart.style.animationDelay = Math.random() * 8 + 's';
+            heart.style.animationDuration = (Math.random() * 4 + 6) + 's';
+            backgroundHearts.appendChild(heart);
+            
+            setTimeout(() => {
+                heart.remove();
+            }, 10000);
+        }
+        
+        // Create background hearts periodically
+        setInterval(createBackgroundHeart, 2000);
+        
+        // Initial background hearts
+        for (let i = 0; i < 5; i++) {
+            setTimeout(createBackgroundHeart, i * 1000);
+        }
+        
+        baoContainer.addEventListener('click', function() {
+            clickCount++;
+            
+            // Remove existing animations
+            baoContainer.classList.remove('clicked', 'wiggling');
+            
+            // Add bounce animation
+            setTimeout(() => {
+                baoContainer.classList.add('clicked');
+            }, 10);
+            
+            // Create sparkles
+            sparkles.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkles.appendChild(sparkle);
+            }
+            
+            // Create floating hearts
+            hearts.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const heart = document.createElement('div');
+                heart.className = 'heart';
+                heart.innerHTML = '♡';
+                hearts.appendChild(heart);
+            }
+            
+            // Show cute message
+            const randomMessage = cuteMessages[Math.floor(Math.random() * cuteMessages.length)];
+            message.innerHTML = randomMessage;
+            message.style.display = 'block';
+            message.style.animation = 'none';
+            setTimeout(() => {
+                message.style.animation = 'showMessage 2s ease-out';
+            }, 10);
+            
+            // Special animation for multiple clicks
+            if (clickCount % 5 === 0) {
+                setTimeout(() => {
+                    baoContainer.classList.add('wiggling');
+                }, 500);
+            }
+            
+            // Clean up animations
+            setTimeout(() => {
+                baoContainer.classList.remove('clicked', 'wiggling');
+                sparkles.innerHTML = '';
+                hearts.innerHTML = '';
+                message.style.display = 'none';
+            }, 1000);
+        });
+        
+        // Add random wiggle occasionally
+        setInterval(() => {
+            if (Math.random() < 0.1) { // 10% chance every 3 seconds
+                baoContainer.classList.add('wiggling');
+                setTimeout(() => {
+                    baoContainer.classList.remove('wiggling');
+                }, 500);
+            }
+        }, 3000);
+    </script>
 </body>
 </html>
