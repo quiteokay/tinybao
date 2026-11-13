@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-title" content="tiny bao">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#70D4F1">
+  <link rel="apple-touch-icon" href="/lilbao_351.png">
+  <link rel="icon" type="image/png" href="/lilbao_351.png">
+  <title>tiny bao community</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
+  <div id="tag" hidden></div>
+  <div id="hint" hidden></div>
+
+  <div id="card" hidden>
+    <h2 id="cardTitle"></h2>
+    <div id="cardBody"></div>
+    <div class="cardBtns"><button id="cardDiary" hidden>read the diary</button><button id="cardOk">ok</button></div>
+  </div>
+
+  <div id="bar">
+    <button class="round" id="bDiary" title="Diary" aria-label="Open the diary">
+      <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5" fill="#FFF3D6"/><path d="M5 3h3v18H5z" fill="#F2A65A"/><path d="M11 8h5M11 12h5M11 16h3"/><rect x="5" y="3" width="14" height="18" rx="2.5" fill="none"/></svg>
+    </button>
+    <div id="tray">
+      <div id="slots"></div>
+      <div id="trayNote">today’s things</div>
+    </div>
+    <div class="right">
+      <button class="round" id="bWeather" title="Weather" aria-label="Change the weather"></button>
+      <button class="round" id="bZap" title="Vaporize" aria-label="Vaporize a bao">
+        <svg viewBox="0 0 24 24"><path d="M13 2 5 13.5h5.5L9 22l9-12.5h-5.5z" fill="#FFD166"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="diary" hidden>
+    <div class="book">
+      <div class="bookHead"><h2 id="diaryTitle">Diary</h2><button id="diaryClose" aria-label="Close">×</button></div>
+      <div id="diaryList"></div>
+      <div class="bookFoot">
+        <span>Your community is saved in this browser only.</span>
+        <span><a href="#" id="exportBtn">keep a copy</a> · <a href="#" id="importBtn">restore a copy</a><input type="file" id="importFile" accept="application/json,.json" hidden></span>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
