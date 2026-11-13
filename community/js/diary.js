@@ -59,7 +59,7 @@ const T = {
   window: ['{a} watched out of the window for a long time.', '{a} stood at the window, thinking.'],
   window_rain: ['{a} watched the rain run down the window.'],
   stargaze: ['{a} went up to the roof to look at the stars.', '{a} counted stars on the roof and lost count twice.'],
-  nap: ['{a} had a nap.', '{a} fell asleep sitting up.', '{a} napped right through the afternoon.'],
+  nap: ['{a} had a nap.', '{a} fell asleep sitting up.', '{a} napped for ages and woke up confused.'],
   read: ['{a} read a whole book.', '{a} was reading and would not be interrupted.'],
   midnight_snack: ['Somebody was in the fridge at midnight. It was {a}.', '{a} had a midnight snack and left the fridge door open.'],
   splash: ['{a} jumped in every puddle in the garden and then needed a bath.'],
@@ -78,7 +78,9 @@ const T = {
   bloom: ['The flowers in the garden came up. {a} noticed first.'],
   paint: ['{a} painted the {room}. Nobody asked {a} to.', '{a} repainted the {room}. It is very bright now.'],
   drawing: ['{a} made a picture and hung it in the {room}.', '{a} painted something. We put it on the wall.'],
-  scribble: ['Somebody drew on the wall in the {room}. {a} looks very innocent.'],
+  scribble: ['Somebody drew on the wall in the {room}. {a} looks very innocent.', 'There is a new scribble on the wall in the {room}. {a} was seen nearby, humming.',
+    'The wall in the {room} has been decorated. {a} says it was like that already.', 'More crayon in the {room}. I am not naming names. It was {a}.',
+    'A small masterpiece appeared at bao height in the {room}. {a} has crayon on one cheek.'],
   tidy: ['{a} carried {thing} to the {room}, where it belongs.', '{a} put {thing} away in the {room}.'],
   duck: ['{a} took the rubber duck into the bath.'],
   teddy: ['{baby} will not let go of the teddy.'],
@@ -92,10 +94,22 @@ const T = {
   build_done: ['The new floor is finished! There is {r1}, {r2} and {r3}. We all stood on the roof and looked at it.'],
   arrival: ['{a} moved in today, {from}.', 'We have a new neighbour: {a} arrived {from}.'],
   cart: ['The rubbish cart came and emptied the bins.'],
-  moved: ['One moment {a} was {from}. The next, {a} was {room}. {a} would rather not talk about it.', '{a} ended up {room} somehow. Nobody saw how.', '{a} says the floor moved. {a} was {from}, and then {a} was {room}.'],
-  vapor: ['{a} is not anywhere. There was a little cloud of steam {room}. {a} will turn up, I expect.', 'I cannot find {a}. I have looked {room} twice. There was only some steam.'],
-  missing: ['Still no sign of {a}. I have left the light on.'],
-  drop: ['There was {thing} {room}. It was not there before.', '{thing_cap} turned up {room}.', 'Found {thing} {room} today.'],
+  moved: ['One moment {a} was {from}. The next, {a} was {room}. {a} would rather not talk about it.', '{a} ended up {room} somehow. Nobody saw how.',
+    '{a} says the floor moved. {a} was {from}, and then {a} was {room}.', '{a} was {from}, blinked, and was {room}.', '{a} turned up {room}, a bit dizzy, with no idea how.',
+    'There was a whoosh, and {a} went from being {from} to being {room}. We have agreed not to think about it.'],
+  vapor: ['{a} is not anywhere. There was a little cloud of steam {room}. {a} will turn up, I expect.', 'I cannot find {a}. I have looked {room} twice. There was only some steam.',
+    '{a} was {room} and then was not. There was a small cloud, the kind a kettle makes.', 'Has anyone seen {a}? There was a puff of steam {room} and that was that.',
+    'Strange thing {room} today: some steam, and no {a}.', 'It smelled like a warm kitchen {room} for a moment, and when I looked there was no {a}.'],
+  vapor_more: ['{a} as well now. A little steam {room}, and no {a}.', 'That makes {n} of us I cannot find. {a} was {room} a moment ago.', 'First {prev}, now {a}. Just a warm, damp patch {room}.',
+    'I went to tell {a} about {prev}, and {a} was not there either. Only steam, {room}.', '{a} is gone too. I am keeping the notebook close.', 'Steam again, {room} this time. {a} is not answering.',
+    'I counted us at supper. I counted again. We are short by {n}.', 'Nobody has seen {a} since the steam {room}. The house feels bigger than it did.',
+    'I have started a list of who is not here. {a} is on it now, under {prev}.', 'Another puff {room}. Another empty spot where {a} was. I do not like the puffs.',
+    '{a} went the same way as {prev}: all at once, and warmly.', 'We do not say the word steam any more. But there was some {room}, and now there is no {a}.'],
+  vapor_last: ['{a} went {room}, in a puff. It is only me now. I will keep writing.', 'No {a} now either. I have the whole house and I do not want it.'],
+  missing: ['Still no sign of {a}. I have left the light on.', 'I set a place for {a} at breakfast anyway.', 'Somebody asked where {a} was. Nobody knew. We changed the subject.',
+    'The bed {a} sleeps in was still made this morning.', 'I looked for {a} again today, in the places I had already looked.', 'No {a}. I checked the roof, in case.'],
+  drop: ['There was {thing} {room}. It was not there before.', '{thing_cap} turned up {room}.', 'Found {thing} {room} today.', 'New today: {thing}, {room}.',
+    'Nobody remembers bringing {thing} into the house, but there it is, {room}.', '{a} found {thing} {room} and stared at it for some time.', 'There is {thing} {room} now. We walked round it twice.'],
   weather_snow: ['It snowed! Everything is white.'],
   weather_rain: ['Rain all over the garden.'],
   quiet: ['A quiet day. Everybody did their own thing.', 'Nothing much happened, in a nice way.'],
@@ -106,7 +120,11 @@ const T = {
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function entryText(S, type, d = {}) {
-  const tpl = pick(T[type] || ['…']);
+  const list = T[type] || ['…'];
+  const usedLately = S.diary.filter((e) => e.k === type).slice(-Math.min(4, list.length - 1)).map((e) => e.i);
+  const fresh = list.map((_, i) => i).filter((i) => !usedLately.includes(i));
+  lastPick = fresh.length ? pick(fresh) : Math.floor(Math.random() * list.length);
+  const tpl = list[lastPick];
   const me = S.diarist;
   const nm = (b) => (!b ? 'somebody' : typeof b === 'string' ? b : b.id === me ? 'I' : b.name);
   const baby = S.baos.find((b) => b.kind === 'baby');
@@ -120,25 +138,31 @@ export function entryText(S, type, d = {}) {
   s = s.replace(/\bI’s\b/g, 'my').replace(/\bI is\b/g, 'I am').replace(/\bI has\b/g, 'I have').replace(/\bI says\b/g, 'I say')
     .replace(/\bI thinks\b/g, 'I think').replace(/\bI blames\b/g, 'I blame').replace(/\bI looks\b/g, 'I look')
     .replace(/like I\b/g, 'like me').replace(/asked I\b/g, 'asked me').replace(/find I\b/g, 'find me').replace(/expect I will/g, 'expect I will')
-    .replace(/of I\b/g, 'of me').replace(/was I\./g, 'was me.').replace(/woke I\b/g, 'woke me').replace(/told I\b/g, 'told me').replace(/and I were/g, 'and I were');
+    .replace(/^I and ([A-Z]\w+(?: [A-Z]\w+)?) /, '$1 and I ').replace(/of I\b/g, 'of me').replace(/was I\./g, 'was me.').replace(/woke I\b/g, 'woke me').replace(/told I\b/g, 'told me').replace(/and I were/g, 'and I were');
   return s;
 }
 
-let lastAt = 0;
+let lastAt = 0, lastPick = 0;
+const actorOf = (d) => (d.a ? (typeof d.a === 'string' ? d.a : d.a.name) : null);
 // important: always recorded. Otherwise entries are spaced out so the diary stays short.
 export function log(S, type, d = {}, opt = {}) {
   const t = opt.t ?? clock.t;
   if (!opt.important) {
     if (!chance(opt.p ?? 0.5)) return null;
-    if (t - lastAt < (opt.gap ?? 600) * 1000 && opt.t == null) return null;
+    if (t - lastAt < (opt.gap ?? 2400) * 1000 && opt.t == null) return null;
     const today = dayKey(t);
     if (S.diary.filter((e) => e.d === today).length >= 12) return null;
+    // no repeats: not the same kind of thing again soon, and not the same bao three times running
+    const recent = S.diary.slice(-6);
+    if (recent.some((e) => e.k === type) || S.diary.some((e) => e.k === type && Math.abs(t - e.t) < 4 * 3600000)) return null;
+    const who = actorOf(d), last2 = S.diary.slice(-2);
+    if (who && last2.length === 2 && last2.every((e) => e.a === who)) return null;
   }
   if (opt.t == null) lastAt = t;
-  let text = entryText(S, type, d);
+  let text = entryText(S, type, d); const idx = lastPick;
   if (opt.theory && d.b) text += ' ' + entryText(S, '_', {}) .replace('…', '') + pick(THEORIES).replace('{b}', d.b.id === S.diarist ? 'I' : d.b.name)
     .replace(/^I says/, 'I say').replace(/^I thinks/, 'I think').replace(/^I is/, 'I am').replace(/^I blames/, 'I blame');
-  const e = { t, d: dayKey(t), text: text.trim(), k: type };
+  const e = { t, d: dayKey(t), text: text.trim(), k: type, i: idx, a: actorOf(d) };
   S.diary.push(e);
   if (S.diary.length > 400) S.diary.splice(0, S.diary.length - 400);
   if (opt.t != null) S.diary.sort((a, b) => a.t - b.t);

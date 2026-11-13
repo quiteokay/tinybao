@@ -128,6 +128,7 @@ function poseOf(b, t) {
     default: sq += Math.sin(t * 2 + ph) * 0.014;
   }
   if (b.joyT > 0 && !['sleep', 'cry', 'dizzy'].includes(expr)) expr = 'joy';
+  if (b.vapor > 0) expr = 'wow';
   return { yo, sq, rot, expr, facing, dx };
 }
 

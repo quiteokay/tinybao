@@ -5,7 +5,8 @@ import { ROOMS, PAINTS, buildFixtures, ladderX, roofFloor, nFloors, xBounds, roo
   nextNewcomer, addNewcomer, addFloor, canGrow, weatherAt, addMark, wallSpot } from './world.js';
 import { log, THINGS } from './diary.js';
 
-export const R = { S: null, fx: [], parts: [], flash: 0, onChange: null };
+export const R = { S: null, fx: [], parts: [], flash: 0, onChange: null, sfx: null };
+const sfx = (name) => { if (R.sfx) R.sfx(name); };
 
 // ---------- particles ----------
 export function emit(k, x, h, o = {}) {
@@ -121,9 +122,10 @@ function runBao(S, b, dt) {
   b.blinkT -= dt; if (b.blinkT <= 0) { b.blink = 0.13; b.blinkT = rand(2, 6); } if (b.blink > 0) b.blink -= dt;
   b.squash *= Math.pow(0.002, dt);
   if (b.held) { b.pose = 'held'; return; }
+  if (b.frozen) return;
   if (b.fall) {
     b.vy -= 1500 * dt; b.alt += b.vy * dt; b.pose = 'held';
-    if (b.alt <= 0) { b.alt = 0; b.fall = false; b.squash = 0.4; b.dizzy = 1.3; burst('puff', b.x, hOf(b) + 4, 5, 26); landedBao(S, b); }
+    if (b.alt <= 0) { b.alt = 0; b.fall = false; b.squash = 0.4; b.dizzy = 1.3; burst('puff', b.x, hOf(b) + 4, 5, 26); sfx('thud'); landedBao(S, b); }
     return;
   }
   if (b.dizzy > 0) { b.dizzy -= dt; b.pose = 'dizzy'; if (b.dizzy <= 0) b.pose = 'idle'; return; }
@@ -265,7 +267,7 @@ const ACTS = [
   { id: 'drum', tags: ['music', 'play'], label: 'playing the drum', try(S, b) {
     const o = freeThing('drum'); if (!o) return;
     return { score: (1 - b.needs.fun) * 0.7, claim: 'obj:' + o.id, plan: [go(o.x - 20, o.floor), act(10, { pose: 'work', expr: 'joy', prop: 'sticks', face: 1,
-      start: (b) => wakeNearby(S, b, 'drum_wake'), tick: (b, dt) => { o.on = clock.t; if (chance(dt * 2.5)) emit('note', o.x + rand(-8, 8), o.floor * FH + 30, { vy: 22 }); },
+      start: (b) => { sfx('drum'); wakeNearby(S, b, 'drum_wake'); }, tick: (b, dt) => { o.on = clock.t; if (chance(dt * 2.5)) emit('note', o.x + rand(-8, 8), o.floor * FH + 30, { vy: 22 }); },
       done: (b) => { b.needs.fun = 1; log(S, 'drum', { a: b }, { p: 0.3 }); } })] };
   } },
   { id: 'dance', tags: ['music', 'play'], label: 'dancing', try(S, b) {
@@ -293,7 +295,7 @@ const ACTS = [
     const o = freeThing('balloon'); if (!o) return;
     return { score: (1 - b.needs.fun) * 0.8, claim: 'obj:' + o.id, plan: [go(o.x, o.floor), act(6, { pose: 'jump', expr: 'joy', done: (b) => {
       b.needs.fun = 1; o.uses = (o.uses ?? 4) - 1;
-      if (o.uses <= 0) { removeThing(o); burst('spark', o.x, o.floor * FH + 80, 8, 60); startleNear(S, o.x, o.floor, 200); log(S, 'balloon_pop', { a: b }, { p: 0.9, gap: 60 }); }
+      if (o.uses <= 0) { removeThing(o); sfx('pop'); burst('spark', o.x, o.floor * FH + 80, 8, 60); startleNear(S, o.x, o.floor, 200); log(S, 'balloon_pop', { a: b }, { p: 0.9, gap: 60 }); }
     } })] };
   } },
   { id: 'snack', tags: ['food'], label: 'having a snack', try(S, b) {
@@ -572,7 +574,7 @@ function startChat(S, a, o) {
 
 function inspectPlan(S, o, jumpy) {
   const steps = [];
-  if (jumpy) steps.push(act(0.9, { pose: 'jump', expr: 'wow', start: (b) => say(b, 'ex', 1) }));
+  if (jumpy) steps.push(act(0.9, { pose: 'jump', expr: 'wow', start: (b) => { say(b, 'ex', 1); sfx('blip'); } }));
   steps.push({ go: () => (S.objects.includes(o) && !o.heldBy ? { x: o.x - 26, floor: o.floor } : null), giveUp: 40 },
     act(4, { pose: 'idle', expr: 'gaze', face: 1, soft: true, start: (b) => say(b, 'q', 2.5), done: (b) => {
       b.needs.fun = Math.min(1, b.needs.fun + 0.3);
@@ -641,7 +643,7 @@ export function releaseThing(o) {
   o.x = clamp(o.x, lo, hi); o.floor = f; o.alt = Math.max(0, h - f * FH); o.held = false; o.falling = true; o.vy = 0; o.t = clock.t;
 }
 function landedThing(S, o) {
-  burst('puff', o.x, o.floor * FH + 4, 4, 22); o.sq = 0.3;
+  burst('puff', o.x, o.floor * FH + 4, 4, 22); o.sq = 0.3; sfx(o.unseen ? 'land' : 'thud');
   if (o.type === 'cake') { log(S, 'cake', {}, { important: true }); addMark(S, { k: 'photo', what: 'cake' }); }
   if (o.unseen) startleNear(S, o.x, o.floor, 230, o);
 }
@@ -651,12 +653,16 @@ export function vaporize(b) {
   const baby = babyOf(S); if (baby && baby.carriedBy === b.id) baby.carriedBy = null;
   S.baos.splice(S.baos.indexOf(b), 1);
   for (let i = 0; i < 22; i++) emit('steam', x + rand(-16, 16), h + rand(4, 34), { vx: rand(-22, 22), vy: rand(20, 60), life: rand(1.2, 2.6), s: rand(0.8, 1.8) });
-  R.flash = 1;
+  R.flash = 1; sfx('steam');
   startleNear(S, x, b.floor, 220);
   const ad = adults(S);
   if (S.diarist === b.id) { S.diarist = ad.length ? pick(ad).id : null; if (S.diarist) log(S, 'handover', { a: S.baos.find((q) => q.id === S.diarist) }, { important: true }); }
-  if (S.diarist) log(S, 'vapor', { a: b.name, room }, { important: true });
-  (S.missing = S.missing || []).push({ name: b.name, t: clock.t });
+  const gone = (S.missing = S.missing || []), NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  if (S.diarist) {
+    const n = gone.length + 1, kind = !gone.length ? 'vapor' : S.baos.length <= 1 ? 'vapor_last' : 'vapor_more';
+    log(S, kind, { a: b.name, room, n: NUM[n] || String(n), prev: gone.length ? gone[gone.length - 1].name : '' }, { important: true });
+  }
+  gone.push({ name: b.name, t: clock.t });
 }
 
 // ---------- daily things ----------
@@ -678,7 +684,7 @@ function arrive(S, live, t) {
   log(S, 'arrival', { a: b, from: spec.from }, { important: true, t: live ? undefined : t });
   addMark(S, { k: 'photo', what: 'arrival' });
   if (live) {
-    b.carry = 'suitcase';
+    sfx('arrive'); b.carry = 'suitcase';
     const r = pick(roomsOf(S, 'living').concat(roomsOf(S, 'kitchen'))) || { f: 0, c: 1 };
     setPlan(b, [go(-36, 0), act(1.6, { pose: 'jump', expr: 'joy', start: (b) => say(b, 'heart') }), go(roomSpot(r), r.f), call((b) => { b.carry = null; }), act(3, { pose: 'idle', expr: 'gaze' })], 'arrive', 'moving in');
     let n = 0;
@@ -707,6 +713,7 @@ function completeBuild(S, live, t) {
   const row = addFloor(S); S.build = null; R.fx = buildFixtures(S);
   addMark(S, { k: 'photo', what: 'floor' });
   log(S, 'build_done', { r1: an(ROOMS[row[0]].name), r2: an(ROOMS[row[1]].name), r3: an(ROOMS[row[2]].name) }, { important: true, t: live ? undefined : t });
+  if (live) sfx('fanfare');
   if (live) for (const b of adults(S)) if (!b.sleeping && interruptible(b)) setPlan(b, [act(3, { pose: 'jump', expr: 'joy', start: (q) => say(q, 'star') })], 'cheer', 'celebrating');
   if (R.onChange) R.onChange('floor');
 }
@@ -734,7 +741,7 @@ function tickWorld(S, dt) {
   // things falling and settling
   for (const o of S.objects) {
     if (o.sq) o.sq *= Math.pow(0.003, dt);
-    if (o.type === 'balloon' && !o.held && !o.heldBy) { const top = o.floor >= nFloors(S) || roomAt(S, o.x, o.floor) == null ? 150 : 78; o.falling = false; o.alt += ((top + Math.sin(clock.t / 700 + o.x) * 4) - o.alt) * Math.min(1, dt * 2); if (o.unseen && !o.told) { o.told = true; startleNear(S, o.x, o.floor, 230, o); } continue; }
+    if (o.type === 'balloon' && !o.held && !o.heldBy) { const top = o.floor >= nFloors(S) || roomAt(S, o.x, o.floor) == null ? 150 : 78; o.falling = false; o.alt += ((top + Math.sin(clock.t / 700 + o.x) * 4) - o.alt) * Math.min(1, dt * 2); if (o.unseen && !o.told) { o.told = true; sfx('land'); startleNear(S, o.x, o.floor, 230, o); } continue; }
     if (o.falling) { o.vy -= 1500 * dt; o.alt += o.vy * dt; if (o.alt <= 0) { o.alt = 0; o.falling = false; o.vy = 0; landedThing(S, o); } }
   }
   // needs
@@ -821,8 +828,10 @@ export function catchUp(S, from, to) {
       for (const [ty, ev] of [['box', 'box'], ['drum', 'drum'], ['radio', 'dance'], ['tv', 'tv'], ['fish', 'fish'], ['mirror', 'mirror']]) if (S.objects.some((o) => o.type === ty)) types.push(ev);
       if (roomsOf(S, 'tearoom').length) types.push('tea'); if (roomsOf(S, 'music').length) types.push('piano');
     }
-    types = types.filter(Boolean);
-    push(log(S, pick(types), { a, b }, { important: true, t }));
+    const lately = S.diary.slice(-7).map((e) => e.k);
+    types = types.filter((ty) => ty && !lately.includes(ty)); if (!types.length) continue;
+    const lastWho = S.diary.length ? S.diary[S.diary.length - 1].a : null, a2 = ad.length > 1 && a.name === lastWho ? pick(ad.filter((x) => x !== a)) : a;
+    push(log(S, pick(types), { a: a2, b: a2 === b ? a : b }, { important: true, t }));
   }
   // leave the house in a believable state
   if (hours > 0.2) {

@@ -5,6 +5,7 @@ import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld,
 import { render } from './draw.js';
 import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
+import * as snd from './sound.js';
 
 const $ = (id) => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
@@ -70,14 +71,15 @@ function setZap(on) { zapOn = on; $('bZap').classList.toggle('on', on); setHint(
 function setArmed(i) { armed = i; if (i >= 0 && zapOn) setZap(false); drawTray(); setHint(i >= 0 ? 'tap anywhere to drop it' : ''); }
 
 canvas.addEventListener('pointerdown', (e) => {
+  snd.unlock();
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 2) {
-    if (down && down.mode === 'bao') releaseBao(down.t.bao); if (down && down.mode === 'thing') releaseThing(down.t.thing); if (down && down.t && down.t.bao) down.t.bao.vapor = 0;
+    if (down && down.mode === 'bao') releaseBao(down.t.bao); if (down && down.mode === 'thing') releaseThing(down.t.thing); if (down && down.t && down.t.bao) { down.t.bao.vapor = 0; down.t.bao.frozen = false; }
     down = null; const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return;
   }
   const t = hit(e.clientX, e.clientY);
   down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t, moved: false, mode: null, id: e.pointerId };
-  if (zapOn && t && t.bao) { down.mode = 'zap'; t.bao.vapor = 0.001; }
+  if (zapOn && t && t.bao) { down.mode = 'zap'; t.bao.vapor = 0.001; t.bao.frozen = true; snd.play('charge'); }
 });
 canvas.addEventListener('pointermove', (e) => {
   if (!ptrs.has(e.pointerId)) { canvas.style.cursor = hit(e.clientX, e.clientY) ? 'grab' : 'default'; return; }
@@ -85,11 +87,11 @@ canvas.addEventListener('pointermove', (e) => {
   if (pinch && ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinch.d); pinch.d = d; return; }
   if (!down || down.id !== e.pointerId) return;
   const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
-  if (down.mode === 'zap') { if (dist > 24) { down.t.bao.vapor = 0; down = null; } return; }
+  if (down.mode === 'zap') return; // the bao holds still, so a wobbly finger does not cancel it
   if (!down.moved && dist > 8) {
     down.moved = true;
-    if (down.t && down.t.bao) { down.mode = 'bao'; pickUpBao(down.t.bao); const p = toWorld(down.x, down.y); down.off = { x: down.t.bao.x - p.x, h: 0 }; tagFor = null; }
-    else if (down.t && down.t.thing) { down.mode = 'thing'; pickUpThingByHand(down.t.thing); }
+    if (down.t && down.t.bao) { down.mode = 'bao'; snd.play('pick'); pickUpBao(down.t.bao); const p = toWorld(down.x, down.y); down.off = { x: down.t.bao.x - p.x, h: 0 }; tagFor = null; }
+    else if (down.t && down.t.thing) { down.mode = 'thing'; snd.play('pick'); pickUpThingByHand(down.t.thing); }
     else down.mode = 'pan';
     canvas.style.cursor = 'grabbing';
   }
@@ -104,11 +106,11 @@ function pointerEnd(e) {
   const d = down; down = null; canvas.style.cursor = 'default';
   if (d.mode === 'bao') { releaseBao(d.t.bao); save(); }
   else if (d.mode === 'thing') { releaseThing(d.t.thing); save(); }
-  else if (d.mode === 'zap') { if (d.t.bao.vapor) d.t.bao.vapor = 0; }
+  else if (d.mode === 'zap') { d.t.bao.vapor = 0; d.t.bao.frozen = false; }
   else if (!d.moved && e.type === 'pointerup') {
     if (armed >= 0) { const p = toWorld(e.clientX, e.clientY); useTray(armed, p.x, p.h); }
-    else if (d.t && d.t.bao) { petBao(d.t.bao); showTag(d.t.bao); }
-    else if (d.t && d.t.thing) { d.t.thing.sq = 0.3; }
+    else if (d.t && d.t.bao) { petBao(d.t.bao); snd.play('pet'); showTag(d.t.bao); }
+    else if (d.t && d.t.thing) { d.t.thing.sq = 0.3; snd.play('blip'); }
     else tagFor = null;
   }
 }
@@ -137,10 +139,10 @@ function drawTray() {
 }
 function useTray(i, x, h) {
   const it = S.tray.items[i]; if (!it || it.used) return;
-  dropThing(it.type, x, Math.max(h, 0) + 2); it.used = true; setArmed(-1); save();
+  dropThing(it.type, x, Math.max(h, 0) + 2); snd.play('whoosh'); it.used = true; setArmed(-1); save();
 }
 function trayDown(e, i, el) {
-  e.preventDefault(); el.setPointerCapture(e.pointerId);
+  e.preventDefault(); snd.unlock(); el.setPointerCapture(e.pointerId);
   const sx = e.clientX, sy = e.clientY; let ghost = null, moved = false;
   const mv = (ev) => {
     if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { moved = true; ghost = document.createElement('canvas'); ghost.id = 'ghost'; thingIcon(ghost, S.tray.items[i].type); document.body.appendChild(ghost); el.style.opacity = 0.3; }
@@ -150,7 +152,7 @@ function trayDown(e, i, el) {
     el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
     if (ghost) ghost.remove(); el.style.opacity = 1;
     if (ev.type === 'pointercancel') return;
-    if (!moved) setArmed(armed === i ? -1 : i);
+    if (!moved) { snd.play('tick'); setArmed(armed === i ? -1 : i); }
     else if (ev.clientY < $('bar').getBoundingClientRect().top + 10) { const p = toWorld(ev.clientX, ev.clientY); useTray(i, p.x, p.h); }
   };
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
@@ -162,9 +164,11 @@ const WX = { sun: '<circle cx="12" cy="12" r="4.5" fill="#FFD166"/><path d="M12 
   snow: '<path d="M7 14a4 4 0 0 1 .6-8 5 5 0 0 1 9.6 1.2A3.4 3.4 0 0 1 17 14z" fill="#F1F6FA"/><g stroke="#7FBDE6"><path d="M8 18.5h.01M12 20h.01M16 18.5h.01M10 21.5h.01M14 17h.01" stroke-width="2.4"/></g>',
   auto: '<circle cx="9" cy="9" r="3.5" fill="#FFD166"/><path d="M9 19a3.5 3.5 0 0 1 .5-7 4.5 4.5 0 0 1 8.6 1A3 3 0 0 1 18 19z" fill="#fff"/>' };
 function drawWeatherBtn() { const k = S.weather || 'auto'; $('bWeather').innerHTML = `<svg viewBox="0 0 24 24">${WX[k]}</svg>`; $('bWeather').title = 'Weather: ' + ({ auto: 'as it comes', sun: 'sunny', rain: 'rain', snow: 'snow' }[k]); }
-$('bWeather').addEventListener('click', () => { const order = [null, 'sun', 'rain', 'snow']; S.weather = order[(order.indexOf(S.weather || null) + 1) % 4]; drawWeatherBtn();
+$('bWeather').addEventListener('click', () => { snd.unlock(); snd.play('tick'); const order = [null, 'sun', 'rain', 'snow']; S.weather = order[(order.indexOf(S.weather || null) + 1) % 4]; drawWeatherBtn();
   setHint({ null: 'weather: as it comes', sun: 'weather: sunny', rain: 'weather: rain', snow: 'weather: snow' }[S.weather]); clearTimeout(drawWeatherBtn.t); drawWeatherBtn.t = setTimeout(() => { if (!zapOn && armed < 0) setHint(''); }, 1400); save(); });
-$('bZap').addEventListener('click', () => { setArmed(-1); setZap(!zapOn); });
+$('bZap').addEventListener('click', () => { snd.unlock(); snd.play('tick'); setArmed(-1); setZap(!zapOn); });
+function drawSoundBtn() { const m = snd.isMuted(); $('bSound').innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="#FFF3D6"/>${m ? '<path d="M16 9.5l5 5M21 9.5l-5 5"/>' : '<path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'}</svg>`; $('bSound').title = m ? 'Sound is off' : 'Sound is on'; $('bSound').setAttribute('aria-pressed', String(!m)); }
+$('bSound').addEventListener('click', () => { snd.unlock(); snd.setMuted(!snd.isMuted()); drawSoundBtn(); snd.play('pet'); });
 
 // ---------- diary ----------
 function dayLabel(key) {
@@ -184,7 +188,7 @@ function openDiary() {
     const h = document.createElement('h3'); h.textContent = dayLabel(k); list.appendChild(h);
     for (const e of days[k]) { const p = document.createElement('p'); p.textContent = e.text; list.appendChild(p); }
   }
-  $('diary').hidden = false; list.scrollTop = 0;
+  $('diary').hidden = false; list.scrollTop = 0; snd.unlock(); snd.play('page');
 }
 $('bDiary').addEventListener('click', openDiary);
 $('diaryClose').addEventListener('click', () => { $('diary').hidden = true; });
@@ -208,7 +212,7 @@ $('cardOk').addEventListener('click', () => { $('card').hidden = true; });
 $('cardDiary').addEventListener('click', () => { $('card').hidden = true; openDiary(); });
 
 function away(from, to) {
-  const made = catchUp(S, from, to); settle(); drawTray(); resize();
+  snd.setQuiet(true); const made = catchUp(S, from, to); settle(); snd.setQuiet(false); drawTray(); resize();
   if (to - from > 20 * 60000 && made.length) showCard('While you were away', made.slice(-4).map((e) => e.text), true);
 }
 
@@ -238,19 +242,19 @@ function boot() {
   if (Q.has('hour')) { const want = +Q.get('hour'), d = new Date(); d.setHours(Math.floor(want), Math.round((want % 1) * 60), 0, 0); clock.t = d.getTime(); } else clock.t = Date.now();
   const loaded = load(); S = loaded || newState();
   const first = !loaded;
-  init(S); R.onChange = (what) => { if (what === 'tray') { armed = -1; drawTray(); } if (what === 'floor') resize(); };
+  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what) => { if (what === 'tray') { armed = -1; drawTray(); } if (what === 'floor') resize(); };
   window.addEventListener('resize', resize); resize();
   let from = S.lastSeen || clock.t;
   if (Q.has('skipDays')) from = clock.t - (+Q.get('skipDays') || 1) * 86400000;
-  if (first) { settle(); S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
+  if (first) { S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' }); settle();
     showCard('The tiny bao community', ['They get on with things by themselves.', 'You can pet them, pick them up and put them somewhere else, and drop in today’s things to see what they make of them.'], false); }
   else if (clock.t - from > 150000) away(from, clock.t);
   else settle();
-  drawTray(); drawWeatherBtn(); save();
+  drawTray(); drawWeatherBtn(); drawSoundBtn(); save();
   setInterval(save, 8000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
-  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld };
+  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd };
   requestAnimationFrame(frame);
 }
 boot();
