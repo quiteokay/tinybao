@@ -721,7 +721,8 @@ function completeBuild(S, live, t) {
 // ---------- the world ticking along ----------
 function tickWorld(S, dt) {
   const h = clock.hour(), w = weatherAt(S);
-  if (dayKey(clock.t) !== S.day) { newDay(S, clock.t, true); ensureTray(S); }
+  if (dayKey(clock.t) !== S.day) newDay(S, clock.t, true);
+  ensureTray(S); // checked on its own: time away can move the day on without passing through here
   if (S.pendingArrival && clock.t >= S.pendingArrival) { S.pendingArrival = 0; arrive(S, true); }
   crowdCheck(S, clock.t, true);
   if (S.fire.fuel > 0) S.fire.fuel = Math.max(0, S.fire.fuel - dt / 380);

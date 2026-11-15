@@ -135,7 +135,19 @@ function drawTray() {
     if (!it.used) { const cv = document.createElement('canvas'); thingIcon(cv, it.type); el.appendChild(cv); el.title = THINGS[it.type].name; el.addEventListener('pointerdown', (e) => trayDown(e, i, el)); }
     box.appendChild(el);
   });
-  $('trayNote').textContent = S.tray.items.every((i) => i.used) ? 'more tomorrow' : 'today’s things';
+  trayNoteAt = 0; updateTrayNote();
+}
+// Under the tray: once today's things are used, count down to midnight (the visitor's own clock).
+let trayNoteAt = 0;
+function updateTrayNote() {
+  if (performance.now() < trayNoteAt) return; trayNoteAt = performance.now() + 1000;
+  let text = 'today’s things';
+  if (S.tray.items.every((i) => i.used)) {
+    const d = new Date(clock.t); d.setHours(24, 0, 0, 0);
+    const mins = Math.ceil((d.getTime() - clock.t) / 60000), h = Math.floor(mins / 60), m = mins % 60;
+    text = mins <= 1 ? 'new things any moment now' : h ? `new things in ${h}h ${String(m).padStart(2, '0')}m` : `new things in ${m}m`;
+  }
+  const el = $('trayNote'); if (el.textContent !== text) el.textContent = text;
 }
 function useTray(i, x, h) {
   const it = S.tray.items[i]; if (!it || it.used) return;
@@ -212,19 +224,19 @@ $('cardOk').addEventListener('click', () => { $('card').hidden = true; });
 $('cardDiary').addEventListener('click', () => { $('card').hidden = true; openDiary(); });
 
 function away(from, to) {
-  snd.setQuiet(true); const made = catchUp(S, from, to); settle(); snd.setQuiet(false); drawTray(); resize();
+  snd.setQuiet(true); const made = catchUp(S, from, to); settle(); snd.setQuiet(false); ensureTray(S); drawTray(); resize();
   if (to - from > 20 * 60000 && made.length) showCard('While you were away', made.slice(-4).map((e) => e.text), true);
 }
 
 // ---------- the loop ----------
-let last = performance.now();
+let last = performance.now(), bootDay = '';
 function frame(now) {
   const real = Math.min(0.25, (now - last) / 1000); last = now;
   const target = TEST ? clock.t + real * 1000 * clock.speed : Date.now();
   const gap = target - clock.t;
   if (gap > 150000 && !TEST) { clock.t = target; away(target - gap, target); }
   else if (gap > 0) { const n = Math.min(240, Math.ceil(gap / 100)), dt = gap / n / 1000; for (let i = 0; i < n; i++) { clock.t += dt * 1000; tick(dt); } }
-  tickParts(real);
+  tickParts(real); updateTrayNote();
   if (down && down.mode === 'zap') { const b = down.t.bao; b.vapor += real / 1.7; if (b.vapor >= 1) { vaporize(b); down = null; setZap(false); save(); } }
   render(ctx, V, S, now / 1000);
   const tag = $('tag');
@@ -242,7 +254,7 @@ function boot() {
   if (Q.has('hour')) { const want = +Q.get('hour'), d = new Date(); d.setHours(Math.floor(want), Math.round((want % 1) * 60), 0, 0); clock.t = d.getTime(); } else clock.t = Date.now();
   const loaded = load(); S = loaded || newState();
   const first = !loaded;
-  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what) => { if (what === 'tray') { armed = -1; drawTray(); } if (what === 'floor') resize(); };
+  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'floor') resize(); };
   window.addEventListener('resize', resize); resize();
   let from = S.lastSeen || clock.t;
   if (Q.has('skipDays')) from = clock.t - (+Q.get('skipDays') || 1) * 86400000;
@@ -250,7 +262,7 @@ function boot() {
     showCard('The tiny bao community', ['They get on with things by themselves.', 'You can pet them, pick them up and put them somewhere else, and drop in today’s things to see what they make of them.'], false); }
   else if (clock.t - from > 150000) away(from, clock.t);
   else settle();
-  drawTray(); drawWeatherBtn(); drawSoundBtn(); save();
+  bootDay = S.tray.day; drawTray(); drawWeatherBtn(); drawSoundBtn(); save();
   setInterval(save, 8000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
