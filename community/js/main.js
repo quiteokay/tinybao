@@ -1,15 +1,17 @@
 // Boot, the frame loop, the camera, and the visitor's hands.
 import { RW, FH, W, OUT, BAO, clamp, clock, dayKey, hourOf } from './core.js';
-import { newState, nFloors, weatherAt, adults } from './world.js';
-import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, vaporize, ensureTray, initBao } from './sim.js';
+import { newState, nFloors, weatherAt, adults, ext, minFloor } from './world.js';
+import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, vaporize, ensureTray, initBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
 import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
+const VERSION = 3; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
 const TEST = ['speed', 'skipDays', 'hour', 'fresh', 'test'].some((k) => Q.has(k));
+if (Q.has('u') && history.replaceState) history.replaceState(null, '', location.pathname + (TEST ? '?test' : '')); // tidy the address after an update
 const KEY = 'tinybao.community.v1' + (TEST ? '.test' : '');
 const canvas = $('c'), ctx = canvas.getContext('2d');
 let S, V = { vw: 0, vh: 0, dpr: 1, s: 1, cx: W / 2, cy: 0, gy: 0, wx0: 0, wx1: 0 }, baseS = 1;
@@ -36,17 +38,40 @@ function resize() {
   canvas.width = Math.round(V.vw * V.dpr); canvas.height = Math.round(V.vh * V.dpr);
   const phone = V.vw < 700, old = baseS;
   V.gy = V.vh - (phone ? 150 : 140);
-  baseS = phone ? V.vw / (W + 76) : clamp(Math.min((V.gy - 50) / (Math.min(nFloors(S) + 1.3, 4.7) * FH), V.vw / (W + 300)), 0.55, 1.6);
+  baseS = phone ? V.vw / (W + 70) : clamp(Math.min((V.gy - 50) / (Math.min(nFloors(S) + 1.3, 4.7) * FH), V.vw / (W + 300)), 0.55, 1.6);
   V.s = old && V.s ? clamp(V.s * baseS / old, minS(), 2.6) : baseS;
+  if (!V.placed) { V.placed = true; V.cy = cyMin(); }
   clampCam();
 }
-const minS = () => Math.min(baseS, V.vw / (W + 2 * OUT + 60), (V.gy - 30) / ((nFloors(S) + 1.4) * FH));
+// The farthest you can zoom out shows today's grounds, not the grounds of the future.
+const minS = () => { const e = ext(S); return Math.min(baseS, V.vw / (e.R - e.L + 80), (V.gy - 30) / ((nFloors(S) + 1.4 - minFloor(S)) * FH)); };
+const cyMin = () => (S.basement ? -(FH + 34) : 0);
 function clampCam() {
-  const half = V.vw / 2 / V.s, lo = -OUT - 40 + half, hi = W + OUT + 40 - half;
-  V.cx = lo >= hi ? W / 2 : clamp(V.cx, lo, hi);
+  const e = ext(S), half = V.vw / 2 / V.s, lo = e.L - 40 + half, hi = e.R + 40 - half;
+  V.cx = lo >= hi ? (e.L + e.R) / 2 : clamp(V.cx, lo, hi);
   const topH = nFloors(S) * FH + 150, vis = (V.gy - 10) / V.s;
-  V.cy = clamp(V.cy, 0, Math.max(0, topH - vis));
+  // when zoomed right in, allow a little extra scroll so a bao on the ground can sit mid-screen
+  const slack = V.s > baseS * 1.25 ? Math.max(0, (V.gy - V.vh * 0.5) / V.s) : 0;
+  V.cy = clamp(V.cy, cyMin() - slack, Math.max(cyMin(), topH - vis));
   V.wx0 = V.cx - half; V.wx1 = V.cx + half;
+}
+// ---------- following a bao ----------
+let follow = null, goHome = false, lastTap = { t: 0, b: null };
+const followS = () => clamp(baseS * 2.3, 1.5, 2.6);
+function startFollow(b, snap) {
+  follow = b; goHome = false; showTag(b);
+  if (snap) { V.s = followS(); V.cx = b.x; V.cy = b.floor * FH + b.alt + 20 - (V.gy - V.vh * 0.5) / V.s; clampCam(); }
+}
+function stopFollow() { follow = null; goHome = false; }
+function stepCamera(real) {
+  if (follow && !S.baos.includes(follow)) follow = null;
+  if (follow) {
+    const k = Math.min(1, real * 3.5); V.s += (followS() - V.s) * Math.min(1, real * 3);
+    V.cx += (follow.x - V.cx) * k; V.cy += (follow.floor * FH + follow.alt + 20 - (V.gy - V.vh * 0.5) / V.s - V.cy) * k; clampCam();
+  } else if (goHome) {
+    const k = Math.min(1, real * 3.5); V.s += (baseS - V.s) * k; V.cx += (W / 2 - V.cx) * k; V.cy += (cyMin() - V.cy) * k; clampCam();
+    if (Math.abs(V.s - baseS) < 0.004) goHome = false;
+  }
 }
 const toWorld = (sx, sy) => ({ x: (sx - V.vw / 2) / V.s + V.cx, h: (V.gy + V.cy * V.s - sy) / V.s });
 const toScreen = (x, h) => ({ x: (x - V.cx) * V.s + V.vw / 2, y: V.gy + V.cy * V.s - h * V.s });
@@ -62,6 +87,7 @@ function hit(sx, sy) {
     if (Math.abs(p.x - b.x) < BAO * 0.52 * sz + pad && Math.abs(p.h - cy) < BAO * 0.46 * sz + pad) return { bao: b }; }
   for (let i = S.objects.length - 1; i >= 0; i--) { const o = S.objects[i]; if (o.heldBy) continue; const cy = o.floor * FH + (o.alt || 0) + (o.type === 'balloon' ? -14 : 14);
     if (Math.abs(p.x - o.x) < 16 + pad && Math.abs(p.h - cy) < 18 + pad) return { thing: o }; }
+  const f = furnAt(p.x, p.h); if (f) return { furn: f };
   return null;
 }
 const ptrs = new Map(); let down = null, pinch = null, armed = -1, zapOn = false, tagFor = null, tagUntil = 0;
@@ -74,11 +100,11 @@ canvas.addEventListener('pointerdown', (e) => {
   snd.unlock();
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 2) {
-    if (down && down.mode === 'bao') releaseBao(down.t.bao); if (down && down.mode === 'thing') releaseThing(down.t.thing); if (down && down.t && down.t.bao) { down.t.bao.vapor = 0; down.t.bao.frozen = false; }
-    down = null; const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return;
+    if (down && down.mode === 'furn') dropFurn(); if (down && down.mode === 'bao') releaseBao(down.t.bao); if (down && down.mode === 'thing') releaseThing(down.t.thing); if (down && down.t && down.t.bao) { down.t.bao.vapor = 0; down.t.bao.frozen = false; }
+    down = null; stopFollow(); const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return;
   }
   const t = hit(e.clientX, e.clientY);
-  down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t, moved: false, mode: null, id: e.pointerId };
+  down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t, moved: false, mode: null, id: e.pointerId, at: performance.now() };
   if (zapOn && t && t.bao) { down.mode = 'zap'; t.bao.vapor = 0.001; t.bao.frozen = true; snd.play('charge'); }
 });
 canvas.addEventListener('pointermove', (e) => {
@@ -88,11 +114,12 @@ canvas.addEventListener('pointermove', (e) => {
   if (!down || down.id !== e.pointerId) return;
   const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
   if (down.mode === 'zap') return; // the bao holds still, so a wobbly finger does not cancel it
+  if (down.mode === 'furn') { const p = toWorld(e.clientX, e.clientY); moveFurn(p.x, p.h - 12); down.moved = true; return; }
   if (!down.moved && dist > 8) {
     down.moved = true;
     if (down.t && down.t.bao) { down.mode = 'bao'; snd.play('pick'); pickUpBao(down.t.bao); const p = toWorld(down.x, down.y); down.off = { x: down.t.bao.x - p.x, h: 0 }; tagFor = null; }
     else if (down.t && down.t.thing) { down.mode = 'thing'; snd.play('pick'); pickUpThingByHand(down.t.thing); }
-    else down.mode = 'pan';
+    else { down.mode = 'pan'; stopFollow(); }
     canvas.style.cursor = 'grabbing';
   }
   if (down.mode === 'pan') { V.cx -= (e.clientX - down.lx) / V.s; V.cy += (e.clientY - down.ly) / V.s; clampCam(); }
@@ -104,26 +131,33 @@ function pointerEnd(e) {
   ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null;
   if (!down || down.id !== e.pointerId) return;
   const d = down; down = null; canvas.style.cursor = 'default';
-  if (d.mode === 'bao') { releaseBao(d.t.bao); save(); }
+  if (d.mode === 'furn') { if (!dropFurn()) snd.play('blip'); setHint(''); save(); }
+  else if (d.mode === 'bao') { releaseBao(d.t.bao); save(); }
   else if (d.mode === 'thing') { releaseThing(d.t.thing); save(); }
   else if (d.mode === 'zap') { d.t.bao.vapor = 0; d.t.bao.frozen = false; }
   else if (!d.moved && e.type === 'pointerup') {
     if (armed >= 0) { const p = toWorld(e.clientX, e.clientY); useTray(armed, p.x, p.h); }
-    else if (d.t && d.t.bao) { petBao(d.t.bao); snd.play('pet'); showTag(d.t.bao); }
+    else if (d.t && d.t.bao) {
+      const now = performance.now(), b = d.t.bao;
+      petBao(b); snd.play('pet'); showTag(b);
+      if (lastTap.b === b && now - lastTap.t < 400) { startFollow(b); snd.play('blip'); lastTap = { t: 0, b: null }; } else lastTap = { t: now, b };
+    }
     else if (d.t && d.t.thing) { d.t.thing.sq = 0.3; snd.play('blip'); }
-    else tagFor = null;
+    else if (d.t && d.t.furn && armed < 0) { setHint('press and hold to move it'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (!zapOn && armed < 0 && !(down && down.mode === 'furn')) setHint(''); }, 1500); }
+    else { const now = performance.now(); tagFor = null; if (lastTap.b === 'sky' && now - lastTap.t < 400) { follow = null; goHome = true; lastTap = { t: 0, b: null }; } else lastTap = { t: now, b: 'sky' }; }
   }
 }
 canvas.addEventListener('pointerup', pointerEnd); canvas.addEventListener('pointercancel', pointerEnd);
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  stopFollow();
   if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
   else { V.cy -= e.deltaY / V.s; V.cx += e.deltaX / V.s; clampCam(); }
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { $('diary').hidden = true; setArmed(-1); setZap(false); }
   const k = { ArrowUp: [0, 60], ArrowDown: [0, -60], ArrowLeft: [-60, 0], ArrowRight: [60, 0] }[e.key];
-  if (k) { V.cx += k[0] / V.s; V.cy += k[1] / V.s; clampCam(); }
+  if (k) { stopFollow(); V.cx += k[0] / V.s; V.cy += k[1] / V.s; clampCam(); }
   if (e.key === '+' || e.key === '=') zoomAt(V.vw / 2, V.vh / 2, 1.15); if (e.key === '-') zoomAt(V.vw / 2, V.vh / 2, 1 / 1.15);
 });
 
@@ -151,7 +185,7 @@ function updateTrayNote() {
 }
 function useTray(i, x, h) {
   const it = S.tray.items[i]; if (!it || it.used) return;
-  dropThing(it.type, x, Math.max(h, 0) + 2); snd.play('whoosh'); it.used = true; setArmed(-1); save();
+  dropThing(it.type, x, Math.max(h, minFloor(S) * FH) + 2); snd.play('whoosh'); it.used = true; setArmed(-1); save();
 }
 function trayDown(e, i, el) {
   e.preventDefault(); snd.unlock(); el.setPointerCapture(e.pointerId);
@@ -215,6 +249,34 @@ $('importFile').addEventListener('change', async (e) => {
   } catch (err) { alert('That file does not look like a saved community.'); }
 });
 
+// ---------- updates ----------
+// Home-screen apps hang on to old files, so this fetches the latest ones on request and says what changed.
+const notesSince = (info, v) => info.changes.filter((c) => c.v > v).flatMap((c) => c.notes);
+async function checkForUpdates() {
+  const link = $('updateBtn'); link.textContent = 'checking…';
+  let info;
+  try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw 0; info = await r.json(); }
+  catch (e) { link.textContent = 'check for updates'; $('diary').hidden = true; showCard('Could not check', ['The baos could not reach the outside world just now. Try again when you are online.'], false); return; }
+  if (!(info.v > VERSION)) {
+    link.textContent = 'check for updates'; $('diary').hidden = true;
+    showCard('You already have the latest', ['Nothing new since your last visit. Lately:'].concat(notesSince(info, VERSION - 1).map((n) => '• ' + n)), false); return;
+  }
+  link.textContent = 'fetching…'; save();
+  try { localStorage.setItem('tinybao.updatedFrom', String(VERSION)); } catch (e) { /* ignore */ }
+  // pull every file fresh so the reload cannot pick up stale copies
+  await Promise.all((info.files || []).map((f) => fetch(f + (f.endsWith('main.js') || f.endsWith('.css') ? '?v=' + info.v : ''), { cache: 'reload' }).catch(() => null)));
+  location.replace(location.pathname + '?u=' + info.v + (TEST ? '&test' : ''));
+}
+async function announceUpdate() {
+  let from; try { from = localStorage.getItem('tinybao.updatedFrom'); localStorage.removeItem('tinybao.updatedFrom'); } catch (e) { return; }
+  if (from == null) return;
+  if (+from >= VERSION) { showCard('Not quite yet', ['The new version would not load this time. Close the app fully, open it again, and it should be there.'], false); return; }
+  let notes = [];
+  try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); notes = notesSince(await r.json(), +from); } catch (e) { /* show the card without the list */ }
+  showCard('Updated!', ['The community has had some work done:'].concat(notes.map((n) => '• ' + n)), false);
+}
+$('updateBtn').addEventListener('click', (e) => { e.preventDefault(); checkForUpdates(); });
+
 function showCard(title, lines, withDiary) {
   $('cardTitle').textContent = title; const body = $('cardBody'); body.innerHTML = '';
   for (const l of lines) { const p = document.createElement('p'); p.textContent = l; body.appendChild(p); }
@@ -236,7 +298,9 @@ function frame(now) {
   const gap = target - clock.t;
   if (gap > 150000 && !TEST) { clock.t = target; away(target - gap, target); }
   else if (gap > 0) { const n = Math.min(240, Math.ceil(gap / 100)), dt = gap / n / 1000; for (let i = 0; i < n; i++) { clock.t += dt * 1000; tick(dt); } }
-  tickParts(real); updateTrayNote();
+  tickParts(real); updateTrayNote(); stepCamera(real);
+  // furniture lifts after a short press, so an ordinary drag still pans the view
+  if (down && !down.mode && !down.moved && down.t && down.t.furn && !zapOn && armed < 0 && now - down.at > 380) { down.mode = 'furn'; liftFurn(down.t.furn); snd.play('pick'); setHint('drop it in any room'); canvas.style.cursor = 'grabbing'; }
   if (down && down.mode === 'zap') { const b = down.t.bao; b.vapor += real / 1.7; if (b.vapor >= 1) { vaporize(b); down = null; setZap(false); save(); } }
   render(ctx, V, S, now / 1000);
   const tag = $('tag');
@@ -254,19 +318,27 @@ function boot() {
   if (Q.has('hour')) { const want = +Q.get('hour'), d = new Date(); d.setHours(Math.floor(want), Math.round((want % 1) * 60), 0, 0); clock.t = d.getTime(); } else clock.t = Date.now();
   const loaded = load(); S = loaded || newState();
   const first = !loaded;
-  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'floor') resize(); };
+  if (first) S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
+  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
   window.addEventListener('resize', resize); resize();
   let from = S.lastSeen || clock.t;
   if (Q.has('skipDays')) from = clock.t - (+Q.get('skipDays') || 1) * 86400000;
-  if (first) { S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' }); settle();
+  if (first) { settle();
     showCard('The tiny bao community', ['They get on with things by themselves.', 'You can pet them, pick them up and put them somewhere else, and drop in today’s things to see what they make of them.'], false); }
   else if (clock.t - from > 150000) away(from, clock.t);
   else settle();
+  // coming back on a new day: open close in on one bao and follow it
+  if (!first && dayKey(from) !== dayKey(clock.t) && S.baos.length) {
+    const ad = S.baos.filter((b) => b.kind !== 'baby'), awake = ad.filter((b) => !b.sleeping), busy = awake.filter((b) => b.act && b.act !== 'wander');
+    let pool = busy.length ? busy : awake.length ? awake : ad.length ? ad : S.baos; const fresh = pool.filter((b) => b.id !== S.lastStar); if (fresh.length) pool = fresh;
+    const star = pool[Math.floor(Math.random() * pool.length)]; S.lastStar = star.id; startFollow(star, true);
+  }
+  announceUpdate();
   bootDay = S.tray.day; drawTray(); drawWeatherBtn(); drawSoundBtn(); save();
   setInterval(save, 8000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
-  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd };
+  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, VERSION, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
   requestAnimationFrame(frame);
 }
 boot();

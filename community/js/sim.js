@@ -1,11 +1,11 @@
 // What the baos do. Each bao has hidden needs and picks its own next activity;
 // chores come from the state of the house. Nothing here is steered by the visitor.
-import { RW, FH, COLS, W, OUT, BAO, clamp, rand, randInt, pick, chance, uid, clock, isNight, darkness, dayKey, hourOf, seeded, hashStr } from './core.js';
-import { ROOMS, PAINTS, buildFixtures, ladderX, roofFloor, nFloors, xBounds, roomAt, roomName, whereIs, roomsOf, roomSpot, bedCount, adults, babyOf,
+import { RW, FH, COLS, W, ROOMW, OUT, BAO, clamp, rand, randInt, pick, chance, uid, clock, isNight, darkness, dayKey, hourOf, seeded, hashStr } from './core.js';
+import { ROOMS, PAINTS, PROJ, ORDER, TREE_SLOTS, buildFixtures, stairX, minFloor, ext, roofFloor, nFloors, xBounds, roomAt, roomName, whereIs, roomsOf, roomSpot, bedCount, adults, babyOf,
   nextNewcomer, addNewcomer, addFloor, canGrow, weatherAt, addMark, wallSpot } from './world.js';
 import { log, THINGS } from './diary.js';
 
-export const R = { S: null, fx: [], parts: [], flash: 0, onChange: null, sfx: null };
+export const R = { S: null, fx: [], parts: [], flash: 0, onChange: null, sfx: null, drag: null };
 const sfx = (name) => { if (R.sfx) R.sfx(name); };
 
 // ---------- particles ----------
@@ -57,7 +57,11 @@ export function initBao(b) {
 }
 
 export function init(S) {
-  R.S = S; R.fx = buildFixtures(S); R.parts = [];
+  R.S = S; R.parts = [];
+  for (const [k, v] of [['furn', {}], ['done', {}], ['bare', {}], ['nopower', {}], ['trees', []], ['projIdx', 0], ['veg', 0]]) if (S[k] == null) S[k] = v;
+  if (S.build) { S.proj = { id: 'floor', p: S.build.p * 0.59 }; delete S.build; } // saves from the first version
+  R.fx = buildFixtures(S);
+  if (!S.proj) startNext(S, true);
   S.baos.forEach(initBao);
   S.objects.forEach((o) => { o.alt = 0; o.vy = 0; o.falling = false; o.heldBy = null; o.held = false; });
   ensureTray(S);
@@ -92,24 +96,32 @@ function stepX(b, tx, dt) {
 }
 function moveToward(b, tg, dt) {
   if (b.climb) {
-    b.pose = 'climb';
-    b.climb.p += dt * (b.speed * 0.8) / FH;
-    const p = Math.min(1, b.climb.p);
-    if (b.climb.dir > 0) { b.alt = p * FH; if (p >= 1) { b.floor++; b.alt = 0; b.climb = null; } }
-    else { b.alt = (1 - p) * FH; if (p >= 1) { b.alt = 0; b.climb = null; } }
+    const k = b.climb; b.pose = k.ladder ? 'climb' : 'hop';
+    k.p += dt * (b.speed * (k.ladder ? 0.8 : 1.15)) / FH;
+    const p = Math.min(1, k.p);
+    b.x = k.xa + (k.xb - k.xa) * p; if (k.xb !== k.xa) b.facing = Math.sign(k.xb - k.xa);
+    b.hop = (b.hop + dt * 2.6) % 1;
+    b.alt = (k.dir > 0 ? p : 1 - p) * FH;
+    if (p >= 1) { if (k.dir > 0) b.floor++; b.alt = 0; b.climb = null; }
     return false;
   }
   b.pose = 'hop';
-  const tf = clamp(tg.floor, 0, roofFloor(R.S));
+  if (!tg) return true;
+  const S = R.S, top = S.floors.length - 1, tf = clamp(tg.floor, minFloor(S), roofFloor(S));
   if (b.floor !== tf) {
-    if (b.kind === 'baby') return true; // babies cannot climb
-    const up = tf > b.floor, lx = ladderX(up ? b.floor : b.floor - 1);
-    if (Math.abs(b.x - lx) < 1.5) {
-      b.x = lx;
-      if (up) b.climb = { dir: 1, p: 0 }; else { b.floor--; b.alt = FH; b.climb = { dir: -1, p: 0 }; }
+    if (b.kind === 'baby') return true; // babies cannot manage stairs
+    const up = tf > b.floor;
+    // going up from the top floor (or down from the roof) is a ladder; everything else is a flight of stairs
+    const ladder = up ? b.floor === top : b.floor === top + 1;
+    const from = up ? stairX(b.floor) : (ladder ? stairX(top) : stairX(b.floor));
+    const to = ladder ? from : (up ? stairX(b.floor + 1) : stairX(b.floor - 1));
+    if (Math.abs(b.x - from) < 1.5) {
+      b.x = from;
+      if (up) b.climb = { dir: 1, p: 0, xa: from, xb: to, ladder };
+      else { b.floor--; b.alt = FH; b.climb = { dir: -1, p: 0, xa: from, xb: to, ladder }; }
       return false;
     }
-    stepX(b, lx, dt); return false;
+    stepX(b, from, dt); return false;
   }
   const [lo, hi] = xBounds(R.S, b.floor), tx = clamp(tg.x, lo, hi);
   if (Math.abs(b.x - tx) < 1.5) { b.x = tx; b.hop = 0; return true; }
@@ -414,11 +426,11 @@ const ACTS = [
     if (ch) plan.push(call((b) => carryBaby(b, baby)), at(ch, -24), call(() => { baby.carriedBy = null; baby.x = ch.x; baby.floor = ch.floor; setPlan(baby, [act(9.5, { pose: 'idle', expr: 'wow', alt: ch.alt })], 'changed', 'being changed'); }));
     plan.push(act(8, { pose: 'work', expr: 'effort', face: 1, tick: (bb, dt) => { if (chance(dt * 1.5)) emit('puff', baby.x + rand(-6, 6), hOf(baby) + 10, { life: 0.7, s: 0.6 }); },
       done: (b) => { baby.needs.diaper = 0; S.bin = Math.min(1, S.bin + 0.15); emit('spark', baby.x, hOf(baby) + 22); log(S, 'baby_change', { a: b }, { p: 0.4 }); } }));
-    return { score: 0.5 + baby.needs.diaper * 0.5, urgent: true, claim: 'baby', plan };
+    return { score: 1.0 + baby.needs.diaper * 0.6, urgent: true, claim: 'baby', plan };
   } },
   { id: 'feedbaby', tags: ['chore', 'baby'], label: 'feeding the baby', try(S, b) {
     const baby = babyOf(S); if (!baby || baby.needs.hunger > 0.35 || baby.carriedBy || baby.held || baby.sleeping || used('baby')) return; const fr = fxs('fridge')[0]; if (!fr) return;
-    return { score: 0.85, urgent: true, claim: 'baby', plan: [at(fr, 12), act(2, { pose: 'work' }), call((b) => { b.carry = 'bottle'; }), { go: () => ({ x: baby.x - 22, floor: baby.floor }), giveUp: 45 },
+    return { score: 1.5, urgent: true, claim: 'baby', plan: [at(fr, 12), act(2, { pose: 'work' }), call((b) => { b.carry = 'bottle'; }), { go: () => ({ x: baby.x - 22, floor: baby.floor }), giveUp: 45 },
       act(7, { pose: 'idle', expr: 'content', prop: 'bottle', face: 1, start: (b) => { b.carry = null; setPlan(baby, [act(7.5, { pose: 'eat', expr: 'chew' })], 'fed', 'having a bottle'); },
         done: (b) => { baby.needs.hunger = 1; log(S, 'baby_feed', { a: b }, { p: 0.3 }); } })] };
   } },
@@ -495,15 +507,58 @@ const ACTS = [
         log(S, 'paint', { a: b, room: ROOMS[r.type].name }, { important: true });
       } })] };
   } },
-  { id: 'build', tags: ['chore'], label: 'building the new floor', try(S, b) {
-    if (!S.build) return; const sc = freeFx('scaffold', b), pl = fxs('planks')[0]; if (!sc) return;
-    return { score: 0.5, claim: sc.key, plan: [at(pl, -22), act(2, { pose: 'work', expr: 'effort' }), call((b) => { b.carry = 'plank'; }), go(sc.x + rand(-150, 150), sc.floor),
-      act(6, { pose: 'work', expr: 'effort', prop: 'hammer', start: (b) => { b.carry = null; }, tick: (b, dt) => { if (chance(dt * 2)) emit('puff', b.x + b.facing * 16, hOf(b) + 8, { life: 0.5, s: 0.5 }); },
-        done: (b) => { if (S.build) S.build.p += 0.0003; log(S, 'build_haul', { a: b }, { p: 0.12 }); } })] };
+  { id: 'build', tags: ['chore'], label: 'building', try(S, b, h) {
+    const P = S.proj; if (!P || isNight(h)) return; const n = used('proj'); if (n >= 3) return;
+    const site = siteOf(S), pl = fxs('planks')[0], what = PROJ[P.id].short;
+    const plan = [];
+    if (site.haul && chance(0.6)) plan.push(at(pl, -22), act(2, { pose: 'work', expr: 'effort' }), call((b) => { b.carry = site.haul; }));
+    plan.push(go(site.x, site.floor), act(rand(7, 11), { pose: site.pose || 'work', expr: 'effort', prop: site.prop, start: (b) => { b.carry = null; if (site.prop === 'driver' && chance(0.5)) say(b, 'bolt', 1.6); },
+      tick: (b, dt) => { if (chance(dt * 2)) emit(site.prop === 'brush' ? 'spark' : 'puff', b.x + b.facing * 16, hOf(b) + (site.prop === 'brush' ? 30 : 8), { life: 0.5, s: 0.5 }); if (site.sway) b.x = clamp(b.x + Math.sin(b.st * 1.1) * 20 * dt, site.lo, site.hi); },
+      done: (b) => { log(S, 'build_haul', { a: b, what }, { p: 0.15 }); } }));
+    return { score: n === 0 ? 1.35 : 0.4, claim: 'proj', label: site.label + ' ' + what, plan };
+  } },
+  { id: 'garden', tags: ['chore', 'green'], label: 'working in the garden', try(S, b, h) {
+    if (isNight(h) || cold(S)) return; const g = freeFx('veg', b) || freeFx('patch', b); if (!g) return;
+    const busy = S.baos.some((o) => o.act === 'garden');
+    return { score: busy ? 0.18 : 0.5, claim: g.key, plan: [go(g.x + rand(-34, 34), 0), act(rand(9, 14), { pose: 'work', expr: 'content', prop: chance(0.5) ? 'can' : 'hoe',
+      done: (b) => { S.veg = Math.min(1, (S.veg || 0) + 0.06); log(S, 'garden', { a: b }, { p: 0.15 }); } })] };
+  } },
+  { id: 'porch', tags: ['rest'], label: 'sitting on the porch', try(S, b) {
+    const f = freeFx('porch', b); if (!f) return;
+    return { score: (1 - b.needs.fun) * 0.5 + 0.08, claim: f.key, plan: [at(f), act(16, { pose: 'sit', expr: 'content', alt: f.alt, soft: true, done: (b) => { b.needs.fun = Math.min(1, b.needs.fun + 0.5); log(S, 'porch', { a: b }, { p: 0.15 }); } })] };
+  } },
+  { id: 'patio', tags: ['rest', 'social'], label: 'sitting out on the patio', try(S, b, h) {
+    const f = freeFx('patio', b); if (!f || cold(S)) return;
+    return { score: (1 - b.needs.fun) * 0.5 + 0.05, claim: f.key, plan: [at(f, used(f.key) ? 24 : -24), act(15, { pose: 'sit', expr: 'content', prop: 'cup', soft: true, done: (b) => { b.needs.fun = Math.min(1, b.needs.fun + 0.5); b.needs.social = Math.min(1, b.needs.social + 0.2); log(S, 'patio', { a: b }, { p: 0.12 }); } })] };
+  } },
+  { id: 'hoops', tags: ['play'], label: 'shooting hoops', try(S, b, h) {
+    const f = freeFx('hoop', b); if (!f || cold(S) || isNight(h)) return;
+    return { score: (1 - b.needs.fun) * 0.7, claim: f.key, plan: [at(f, used(f.key) ? 54 : 0), act(11, { pose: 'jump', expr: 'joy', face: -1, shoot: true, done: (b) => { b.needs.fun = 1; b.needs.energy -= 0.06; log(S, 'hoops', { a: b }, { p: 0.2 }); } })] };
+  } },
+  { id: 'bowl', tags: ['play'], label: 'bowling', try(S, b) {
+    const f = freeFx('lane', b); if (!f) return;
+    return { score: (1 - b.needs.fun) * 0.75, claim: f.key, plan: [at(f), act(10.4, { pose: 'work', expr: 'effort', face: 1, bowl: true,
+      tick: (b) => { const k = b.st % 2.6; if (k > 1.5 && !b.struck) { b.struck = true; sfx('pop'); } if (k < 1) b.struck = false; },
+      done: (b) => { b.needs.fun = 1; log(S, 'bowl', { a: b }, { p: 0.25 }); } })] };
+  } },
+  { id: 'tennis', tags: ['play'], label: 'playing tennis', try(S, b, h) {
+    const f = freeFx('tennis', b); if (!f || cold(S) || isNight(h)) return;
+    return { score: (1 - b.needs.fun) * 0.7, claim: f.key, plan: [at(f), act(12, { pose: 'jump', expr: 'joy', prop: 'racket', face: f.end ? -1 : 1, rally: true, done: (b) => { b.needs.fun = 1; b.needs.energy -= 0.08; log(S, 'tennis', { a: b }, { p: 0.2 }); } })] };
+  } },
+  { id: 'fishing', tags: ['rest', 'look'], label: 'fishing', try(S, b, h) {
+    const f = freeFx('shore', b); if (!f || isNight(h)) return;
+    return { score: (1 - b.needs.fun) * 0.55 + 0.05, claim: f.key, plan: [at(f), act(18, { pose: 'sit', expr: 'content', prop: 'rod', face: 1, soft: true,
+      done: (b) => { b.needs.fun = Math.min(1, b.needs.fun + 0.6); log(S, chance(0.4) ? 'fish_catch' : 'fishing', { a: b }, { p: 0.25 }); } })] };
+  } },
+  { id: 'boat', tags: ['play', 'look'], label: 'out in the boat', try(S, b, h) {
+    const f = freeFx('boat', b); if (!f || isNight(h) || cold(S)) return;
+    return { score: (1 - b.needs.fun) * 0.7 + 0.05, claim: f.key, plan: [at(f), act(24, { pose: 'sit', expr: 'content', front: 'boat', alt: 5,
+      tick: (b) => { const k = (1 - Math.cos(b.st / 24 * Math.PI * 2)) / 2; const nx = f.x + k * 250; b.facing = Math.sign(nx - b.x) || b.facing; b.x = nx; },
+      done: (b) => { b.x = f.x; b.needs.fun = 1; log(S, 'boat', { a: b }, { p: 0.25 }); } })] };
   } },
   { id: 'wander', tags: [], label: 'pottering about', try(S, b) {
     const f = clamp(b.floor + randInt(-1, 1), 0, nFloors(S) - 1);
-    return { score: 0.12, plan: [go(rand(20, W - 20), f), act(rand(2, 5), { pose: 'idle', soft: true })] };
+    return { score: 0.12, plan: [go(rand(20, ROOMW - 20), f), act(rand(2, 5), { pose: 'idle', soft: true })] };
   } },
 ];
 
@@ -544,7 +599,14 @@ function chooseBaby(S, b) {
   const n = b.needs; let plan, label = 'crawling about';
   if (n.diaper > 0.92 || n.hunger < 0.12) {
     label = 'crying';
-    plan = [act(6, { pose: 'cry', expr: 'cry', tick: (b, dt) => { if (chance(dt * 5)) emit('drop', b.x + pick([-9, 9]), hOf(b) + 14, { vx: rand(-14, 14), vy: 20, life: 0.6, s: 0.5 }); }, start: () => log(S, 'baby_cry', {}, { p: 0.05 }) })];
+    plan = [act(6, { pose: 'cry', expr: 'cry', tick: (b, dt) => { if (chance(dt * 5)) emit('drop', b.x + pick([-9, 9]), hOf(b) + 14, { vx: rand(-14, 14), vy: 20, life: 0.6, s: 0.5 }); }, start: (bb) => {
+      log(S, 'baby_cry', {}, { p: 0.05 });
+      // nobody up? the crying wakes whoever is nearest
+      const ad = adults(S); if (ad.length && !ad.some((q) => !q.sleeping)) {
+        const near = ad.slice().sort((p, q) => (Math.abs(p.floor - bb.floor) * 400 + Math.abs(p.x - bb.x)) - (Math.abs(q.floor - bb.floor) * 400 + Math.abs(q.x - bb.x)))[0];
+        abort(near); near.owl = clock.t + 240000; say(near, 'ex', 1.5); log(S, 'baby_night', { a: near }, { p: 0.6 });
+      }
+    } })];
   } else if (n.energy < 0.1) {
     label = 'asleep'; plan = [act(45, { pose: 'sleep', expr: 'sleep', sleep: true, soft: true, done: (b) => { b.needs.energy = 0.8; } })];
   } else {
@@ -554,7 +616,7 @@ function chooseBaby(S, b) {
     if (teddy && r < 0.4) { label = 'cuddling the teddy'; plan = [go(teddy.x - 10, b.floor), act(8, { pose: 'sit', expr: 'joy', tick: (b, dt) => { if (chance(dt * 0.8)) emit('heart', b.x, hOf(b) + 26, { vy: 22 }); }, done: (b) => { b.needs.fun = 1; log(S, 'teddy', {}, { p: 0.1 }); } })]; }
     else if (toy && r < 0.6) { label = 'playing'; plan = [go(toy.x + 22, b.floor), act(8, { pose: 'dance', expr: 'joy', done: (b) => { b.needs.fun = 1; } })]; }
     else {
-      const lo = b.floor === 0 ? 20 : 16, hi = W - 20;
+      const lo = b.floor === 0 ? 20 : 16, hi = ROOMW - 20;
       plan = [go(clamp(b.x + rand(-120, 120), lo, hi), b.floor), act(rand(2, 5), { pose: 'idle', soft: true })];
     }
   }
@@ -598,7 +660,7 @@ function startleNear(S, x, floor, range, o) {
 // ---------- things the visitor does ----------
 export function landFloor(S, x, h) {
   if (x < 6 || x > W - 6) return 0;
-  return clamp(Math.floor((h + 6) / FH), 0, roofFloor(S));
+  return clamp(Math.floor((h + 6) / FH), minFloor(S), roofFloor(S));
 }
 export function petBao(b) {
   const S = R.S;
@@ -612,7 +674,7 @@ export function pickUpBao(b) {
   if (b.carriedBy) b.carriedBy = null;
   b.held = true; b.expr = 'wow';
 }
-export function moveHeld(e, x, h) { e.x = x; e.floor = 0; e.alt = Math.max(0, h); }
+export function moveHeld(e, x, h) { e.x = x; e.floor = 0; e.alt = Math.max(minFloor(R.S) * FH, h); }
 export function releaseBao(b) {
   const S = R.S, h = b.alt, f = landFloor(S, b.x, h);
   const [lo, hi] = xBounds(S, f);
@@ -632,6 +694,27 @@ export function dropThing(type, x, h) {
   S.objects.push(o);
   if (S.objects.length > 40) { const old = S.objects.find((q) => !q.heldBy && q !== o); if (old) removeThing(old); }
   return o;
+}
+// ---------- moving furniture ----------
+export function furnAt(x, h) {
+  for (let i = R.fx.length - 1; i >= 0; i--) { const f = R.fx[i]; if (!f.mid) continue; const dh = h - f.floor * FH; if (Math.abs(x - f.x) < 24 && dh > -4 && dh < 62) return f; }
+  return null;
+}
+export function liftFurn(f) {
+  const keys = new Set(R.fx.filter((q) => q.mid === f.mid).map((q) => q.key));
+  for (const b of R.S.baos) if (keys.has(b.claim)) { abort(b); if (b.kind !== 'baby') say(b, 'ex', 1.2); }
+  R.drag = { mid: f.mid, from: f.x, x: f.x, h: f.floor * FH };
+}
+export function moveFurn(x, h) { if (R.drag) { R.drag.x = x; R.drag.h = h; } }
+export function dropFurn() {
+  const S = R.S, d = R.drag; if (!d) return false; R.drag = null;
+  const f = landFloor(S, d.x, d.h), ok = f >= 0 && f < nFloors(S) && d.x > 4 && d.x < ROOMW - 4 && S.bare[f + ',' + clamp(Math.floor(d.x / RW), 0, COLS - 1)] == null;
+  if (!ok) return false; // put back where it was
+  S.furn[d.mid] = { x: Math.round(clamp(d.x, 22, ROOMW - 22)), floor: f };
+  R.fx = buildFixtures(S); sfx('thud'); burst('puff', d.x, f * FH + 4, 4, 22);
+  // anyone heading for where things used to be thinks again
+  for (const b of S.baos) if (b.plan && !b.sleeping && !b.held && !b.carriedBy && !b.chatWith) abort(b);
+  return true;
 }
 export function pickUpThingByHand(o) {
   const S = R.S;
@@ -703,20 +786,69 @@ function newDay(S, t, live) {
   }
   if (S.outBin > 0.6) { S.outBin = 0; log(S, 'cart', {}, { p: 0.4, t: live ? undefined : t + 7 * 3600000, important: !live && chance(0.3) }); }
 }
-function crowdCheck(S, t, live) {
-  const h = hourOf(t);
-  if (S.build || h < 9 || h > 18 || !canGrow(S) || adults(S).length < bedCount(S) || !adults(S).length) return;
-  S.build = { p: 0, t };
-  log(S, 'build_start', { a: pick(adults(S)) }, { important: true, t: live ? undefined : t });
+// ---------- the community is always building something ----------
+// Where the workers go right now, and what they are doing there.
+function siteOf(S) {
+  const P = S.proj, d = PROJ[P.id], p = P.p, rf = roofFloor(S);
+  const stage = (dig) => (p < 0.35 ? { prop: dig ? 'shovel' : 'hammer', label: dig ? 'digging' : 'building', haul: dig ? null : 'plank' } : p < 0.7 ? { prop: 'hammer', label: 'building', haul: 'plank' }
+    : p < 0.9 ? { prop: 'brush', label: 'painting', pose: 'jump' } : { prop: 'driver', label: 'wiring up' });
+  if (P.id === 'floor') {
+    if (p < 0.6) return { x: 300 + rand(-180, 180), floor: rf, prop: 'hammer', label: 'building', haul: 'plank' };
+    const c = p < 0.7 ? 0 : p < 0.8 ? 1 : 2, x0 = c * RW;
+    if (p < 0.9) return { x: x0 + rand(30, 150), floor: P.f, prop: 'brush', pose: 'jump', label: 'painting', sway: true, lo: x0 + 20, hi: x0 + 160 };
+    return { x: rand(30, ROOMW - 30), floor: P.f, prop: 'driver', label: 'wiring up' };
+  }
+  if (P.id === 'bowling') { const dug = Math.min(1, p / 0.5), lo = W - 30 - dug * (W - 70); return { x: p < 0.5 ? lo + 14 : rand(60, W - 140), floor: -1, ...(p < 0.5 ? { prop: 'shovel', label: 'digging out' } : stage(false)) }; }
+  if (P.id === 'repaint') { const x0 = P.c * RW; return { x: x0 + rand(30, 150), floor: P.f, prop: 'brush', pose: 'jump', label: 'doing', sway: true, lo: x0 + 20, hi: x0 + 160 }; }
+  if (P.id === 'tree' || P.id === 'birdhouse') return { x: P.x - 22, floor: 0, prop: P.id === 'tree' ? 'shovel' : 'hammer', label: P.id === 'tree' ? 'planting' : 'putting up' };
+  if (P.id === 'lake') return { x: W + 520 + rand(0, 20), floor: 0, ...(p < 0.85 ? { prop: 'shovel', label: 'digging' } : { prop: 'can', label: 'filling' }) };
+  if (P.id === 'veg' || P.id === 'flowers') return { x: d.x + rand(-40, 40), floor: 0, prop: p < 0.6 ? 'shovel' : 'can', label: 'planting' };
+  return { x: d.x + rand(-36, 36), floor: 0, ...stage(P.id === 'court' || P.id === 'tennis') };
 }
-function completeBuild(S, live, t) {
-  const row = addFloor(S); S.build = null; R.fx = buildFixtures(S);
-  addMark(S, { k: 'photo', what: 'floor' });
-  log(S, 'build_done', { r1: an(ROOMS[row[0]].name), r2: an(ROOMS[row[1]].name), r3: an(ROOMS[row[2]].name) }, { important: true, t: live ? undefined : t });
-  if (live) sfx('fanfare');
-  if (live) for (const b of adults(S)) if (!b.sleeping && interruptible(b)) setPlan(b, [act(3, { pose: 'jump', expr: 'joy', start: (q) => say(q, 'star') })], 'cheer', 'celebrating');
-  if (R.onChange) R.onChange('floor');
+function startNext(S, live, t) {
+  let id = null;
+  // once the big list is down to just more floors, do a few small jobs between each one
+  const tail = S.projIdx >= ORDER.lastIndexOf('boat') + 1, rest = (S.sinceFloor || 0) < 3;
+  if (!(tail && rest)) while (S.projIdx < ORDER.length && !id) { const k = ORDER[S.projIdx++]; if (k !== 'floor' || canGrow(S)) id = k; }
+  if (id === 'floor') S.sinceFloor = 0; else if (tail) S.sinceFloor = (S.sinceFloor || 0) + 1;
+  const P = { id, p: 0 };
+  if (!id) {
+    // the big list is finished: keep planting, decorating and repainting for ever
+    const n = (S.fillN = (S.fillN || 0) + 1), slot = TREE_SLOTS.find((x) => !S.trees.some((tr) => tr.x === x)), bare = S.trees.find((tr) => !tr.house);
+    P.id = n % 3 === 1 && slot != null ? 'tree' : n % 3 === 2 && bare && S.trees.filter((tr) => tr.house).length < 4 ? 'birdhouse' : n % 3 === 0 && S.flowers.length < 14 ? 'flowers' : 'repaint';
+    if (P.id === 'tree') P.x = slot; if (P.id === 'birdhouse') P.x = bare.x;
+    if (P.id === 'repaint') { const done = []; S.floors.forEach((row, f) => row.forEach((_, c) => { if (S.bare[f + ',' + c] == null) done.push({ f, c }); })); const r = pick(done); P.f = r.f; P.c = r.c; P.room = ROOMS[S.floors[r.f][r.c]].name; }
+  }
+  S.proj = P;
+  if (P.id === 'bowling') { S.basement = true; R.fx = buildFixtures(S); if (R.onChange) R.onChange('floor'); }
+  const small = ['tree', 'birdhouse', 'flowers', 'repaint'].includes(P.id);
+  if (adults(S).length && (!small || P.id === 'repaint')) log(S, small ? 'repaint_start' : 'proj_start', { a: pick(adults(S)), what: PROJ[P.id].name, room: P.room }, { important: !small, p: 0.5, t: live ? undefined : t });
+  if (R.onChange) R.onChange('grounds');
 }
+const crossed = (a, b, th) => a < th && b >= th;
+function advance(S, hours, live, t) {
+  if (!S.proj) startNext(S, live, t);
+  const P = S.proj, d = PROJ[P.id], a = P.p, lt = live ? undefined : t, who = adults(S).length ? pick(adults(S)) : null;
+  P.p = Math.min(1, a + hours / d.hours); const p = P.p;
+  if (P.id === 'floor') {
+    if (crossed(a, p, 0.6)) {
+      const row = addFloor(S); P.f = S.floors.length - 1; R.fx = buildFixtures(S);
+      if (who) log(S, 'floor_up', { r1: an(ROOMS[row[0]].name), r2: an(ROOMS[row[1]].name), r3: an(ROOMS[row[2]].name) }, { important: true, t: lt });
+      if (live) { sfx('fanfare'); cheer(S); } if (R.onChange) R.onChange('floor');
+    }
+    [0.7, 0.8, 0.9].forEach((th, c) => { if (crossed(a, p, th) && P.f != null) { delete S.bare[P.f + ',' + c]; R.fx = buildFixtures(S); if (who) log(S, 'floor_paint', { a: who, room: ROOMS[S.floors[P.f][c]].name }, { important: true, t: lt }); } });
+  }
+  if (p < 1) return;
+  // finished
+  if (P.id === 'floor') { if (P.f != null) { delete S.nopower[P.f]; for (let c = 0; c < COLS; c++) delete S.bare[P.f + ',' + c]; } R.fx = buildFixtures(S); if (who) log(S, 'floor_power', { a: who }, { important: true, t: lt }); }
+  else if (P.id === 'tree') { S.trees.push({ x: P.x, t: live ? clock.t : t }); if (who) log(S, 'tree_done', { a: who }, { important: true, t: lt }); }
+  else if (P.id === 'birdhouse') { const tr = S.trees.find((q) => q.x === P.x); if (tr) tr.house = true; if (who) log(S, 'birdhouse_done', { a: who }, { important: true, t: lt }); }
+  else if (P.id === 'flowers') { for (let i = 0; i < 3; i++) if (S.flowers.length < 14) S.flowers.push({ x: W + 190 + rand(-44, 44), t: live ? clock.t : t, hue: pick([340, 20, 48, 280, 200]), seen: true }); if (who) log(S, 'flowers_done', { a: who }, { p: 0.6, t: lt }); }
+  else if (P.id === 'repaint') { const key = P.f + ',' + P.c; let col; do { col = pick(PAINTS); } while (col === S.paint[key]); S.paint[key] = col; if (who) log(S, 'repaint_done', { a: who, room: P.room }, { important: true, t: lt }); }
+  else { S.done[P.id] = true; addMark(S, { k: 'photo', what: 'floor' }); R.fx = buildFixtures(S); if (who) log(S, 'done_' + P.id, { a: who }, { important: true, t: lt }); if (live) { sfx('fanfare'); cheer(S); } }
+  S.proj = null; startNext(S, live, t);
+}
+function cheer(S) { for (const b of adults(S)) if (!b.sleeping && interruptible(b)) setPlan(b, [act(3, { pose: 'jump', expr: 'joy', start: (q) => say(q, 'star') })], 'cheer', 'celebrating'); }
 
 // ---------- the world ticking along ----------
 function tickWorld(S, dt) {
@@ -724,7 +856,6 @@ function tickWorld(S, dt) {
   if (dayKey(clock.t) !== S.day) newDay(S, clock.t, true);
   ensureTray(S); // checked on its own: time away can move the day on without passing through here
   if (S.pendingArrival && clock.t >= S.pendingArrival) { S.pendingArrival = 0; arrive(S, true); }
-  crowdCheck(S, clock.t, true);
   if (S.fire.fuel > 0) S.fire.fuel = Math.max(0, S.fire.fuel - dt / 380);
   const L = S.laundry;
   if (L.machineEnd && clock.t >= L.machineEnd) { L.machineEnd = 0; L.wet = true; }
@@ -735,7 +866,7 @@ function tickWorld(S, dt) {
   S.snow = clamp(S.snow + (w === 'snow' ? dt / 90 : -dt / 300), 0, 1);
   S.wet = clamp(S.wet + (w === 'rain' ? dt / 50 : -dt / 240), 0, 1);
   if (S.snow <= 0 && S.snowbaos.length) S.snowbaos.length = 0;
-  if (S.build && !isNight(h)) { S.build.p += dt / (40 * 3600); if (S.build.p >= 1) completeBuild(S, true); }
+  if (!isNight(h)) advance(S, dt / 3600, true);
   if (S.outBin >= 1) { S.outBin = 0; log(S, 'cart', {}, { p: 0.5 }); }
   if (chance(dt * 0.0016) && adults(S).length) { const r = pick(roomsOf(S, 'bedroom').concat(roomsOf(S, 'living'))); if (r) addMess('sock', roomSpot(r), r.f); }
   for (const f of S.flowers) if (!f.seen && clock.t - f.t > 2 * 86400000) { S.flowers.forEach((q) => { if (clock.t - q.t > 2 * 86400000) q.seen = true; }); if (adults(S).length) log(S, 'bloom', { a: pick(adults(S)) }, { important: true }); break; }
@@ -792,7 +923,7 @@ export function settle() {
       if (st.go) {
         const tg = typeof st.go === 'function' ? st.go(b) : st.go;
         if (!tg) { endPlan(b); break; }
-        if (b.kind !== 'baby' || tg.floor === b.floor) { const [lo, hi] = xBounds(S, tg.floor); b.x = clamp(tg.x, lo, hi); b.floor = clamp(tg.floor, 0, roofFloor(S)); }
+        if (b.kind !== 'baby' || tg.floor === b.floor) { const [lo, hi] = xBounds(S, tg.floor); b.x = clamp(tg.x, lo, hi); b.floor = clamp(tg.floor, minFloor(S), roofFloor(S)); }
         b.si++;
       } else if (st.call) { const p = b.plan; st.call(b); if (b.plan !== p) break; b.si++; }
       else { b.st = Math.min(st.act * 0.6, rand(0, st.act)); if (st.sleep) b.st = 0; break; }
@@ -812,8 +943,7 @@ export function catchUp(S, from, to) {
       const hr = hourOf(to);
       if (to - S.pendingArrival < 4 * 3600000 && hr >= 7 && hr < 21) S.pendingArrival = to + rand(25, 70) * 1000; else { arrive(S, false, S.pendingArrival); S.pendingArrival = 0; }
     }
-    crowdCheck(S, t, false);
-    if (S.build && awake) { S.build.p += 1 / 40; if (S.build.p >= 1) completeBuild(S, false, t); }
+    if (awake) advance(S, 1, false, t);
     const ad = adults(S); if (!ad.length || !S.diarist) continue;
     if (!chance(awake ? 0.2 : 0.035)) continue;
     const day = dayKey(t); if (S.diary.filter((e) => e.d === day).length >= 5) continue;
@@ -824,7 +954,8 @@ export function catchUp(S, from, to) {
       types = ['trash', 'dishes', 'sweep', 'cook', 'bath', 'window', 'nap', 'laundry', 'hang', 'firewood', 'read', b && 'chat', b && 'chat', baby && 'baby_change', baby && 'baby_feed'];
       if (h >= 17) types.push('fire', 'fire'); if (h >= 20) types.push('stargaze', baby && 'baby_sleep');
       if (w === 'rain') types.push('window_rain', 'splash', 'rain_laundry'); if (w === 'snow') types.push('snowbao', 'snowbao');
-      if (S.build) types.push('build_haul', 'build_haul');
+      if (S.proj) types.push('build_haul', 'build_haul'); types.push('garden');
+      for (const [d, ev] of [['porch', 'porch'], ['patio', 'patio'], ['court', 'hoops'], ['bowling', 'bowl'], ['tennis', 'tennis'], ['lake', 'fishing'], ['boat', 'boat']]) if (S.done[d]) types.push(ev);
       if (S.objects.some((o) => o.type === 'plant') || roomsOf(S, 'greenhouse').length) types.push('water');
       for (const [ty, ev] of [['box', 'box'], ['drum', 'drum'], ['radio', 'dance'], ['tv', 'tv'], ['fish', 'fish'], ['mirror', 'mirror']]) if (S.objects.some((o) => o.type === ty)) types.push(ev);
       if (roomsOf(S, 'tearoom').length) types.push('tea'); if (roomsOf(S, 'music').length) types.push('piano');
@@ -832,7 +963,7 @@ export function catchUp(S, from, to) {
     const lately = S.diary.slice(-7).map((e) => e.k);
     types = types.filter((ty) => ty && !lately.includes(ty)); if (!types.length) continue;
     const lastWho = S.diary.length ? S.diary[S.diary.length - 1].a : null, a2 = ad.length > 1 && a.name === lastWho ? pick(ad.filter((x) => x !== a)) : a;
-    push(log(S, pick(types), { a: a2, b: a2 === b ? a : b }, { important: true, t }));
+    push(log(S, pick(types), { a: a2, b: a2 === b ? a : b, what: S.proj ? PROJ[S.proj.id].short : '' }, { important: true, t }));
   }
   // leave the house in a believable state
   if (hours > 0.2) {

@@ -1,0 +1,21 @@
+{
+  "v": 3,
+  "files": ["index.html", "style.css", "js/main.js", "js/core.js", "js/world.js", "js/sim.js", "js/diary.js", "js/draw.js", "js/drawbao.js", "js/drawthings.js", "js/drawsites.js", "js/sound.js"],
+  "changes": [
+    { "v": 3, "notes": [
+      "the baos never stop building now: a porch, a garden, courts, a bowling alley, even a lake",
+      "stairs! no more ladders between floors",
+      "the bathroom and one bedroom got a front wall and a big window",
+      "press and hold furniture to move it to any room",
+      "double-tap a bao to zoom in and follow it",
+      "new things arrive at midnight, with a countdown",
+      "this update button"
+    ] },
+    { "v": 2, "notes": [
+      "added sound effects",
+      "the diary repeats itself less",
+      "baos hold still when you vaporize them"
+    ] },
+    { "v": 1, "notes": ["the tiny bao community opened its doors"] }
+  ]
+}

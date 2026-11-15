@@ -233,6 +233,8 @@ export function icon(c, name, x, y, s) {
     case 'sun':
       c.beginPath(); c.arc(0, 0, s * 0.28, 0, 7); F('#FFD166'); c.stroke();
       c.strokeStyle = '#F2A541'; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; c.beginPath(); c.moveTo(Math.cos(a) * s * 0.4, Math.sin(a) * s * 0.4); c.lineTo(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55); c.stroke(); } break;
+    case 'bolt':
+      c.beginPath(); c.moveTo(s * 0.1, -s * 0.55); c.lineTo(-s * 0.35, s * 0.05); c.lineTo(-s * 0.02, s * 0.05); c.lineTo(-s * 0.15, s * 0.55); c.lineTo(s * 0.35, -s * 0.1); c.lineTo(s * 0.02, -s * 0.1); c.closePath(); F('#FFD166'); c.stroke(); break;
     case 'bao':
       c.scale(s / BAO * 1.1, s / BAO * 1.1); c.translate(0, BAO * 0.42); drawBaoShape(c, {}, 0); break;
   }

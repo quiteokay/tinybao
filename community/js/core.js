@@ -2,12 +2,13 @@
 export const RW = 190;      // room width (world units)
 export const FH = 120;      // floor height
 export const COLS = 3;
-export const W = RW * COLS; // building width
+export const ROOMW = RW * COLS; // width of the three room columns
+export const SW = 110;           // the stairwell column on the right
+export const W = ROOMW + SW;     // whole building width
 export const SLAB = 10;
 export const BAO = 42;      // adult bao width
-export const OUT = 250;     // how far the garden extends either side
+export const OUT = 250;     // how far the garden reaches on day one; it spreads as things get built
 export const MAXF = 10;     // tallest the building gets
-export const LCOL = [1, 0, 2]; // which column the ladder of each floor sits in
 export const INK = '#3a2a22';
 
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

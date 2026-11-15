@@ -120,7 +120,7 @@ export const FX = {
     for (let i = 0; i < S.laundry.line; i++) { const x = -30 + i * 15, y = -58 + Math.sin((x + 40) / 80 * Math.PI) * 3.5, sw = Math.sin(t * 2 + i) * 0.08;
       c.save(); c.translate(x, y); c.rotate(sw); if (i % 2) B(c, -5, 0, 10, 14, 2, cols[i % 5], 1.1); else { B(c, -3, 0, 6, 13, [1, 1, 3, 3], cols[i % 5], 1.1); } c.restore(); }
   },
-  planks(c, f, S) { if (!S.build) return; for (let i = 0; i < 5; i++) B(c, -24 + (i % 2) * 4, -6 - i * 5, 46, 5, 1, i % 2 ? '#E3BE8E' : '#D7AC78', 1.1); },
+  planks(c, f, S) { if (!S.proj) return; for (let i = 0; i < 5; i++) B(c, -24 + (i % 2) * 4, -6 - i * 5, 46, 5, 1, i % 2 ? '#E3BE8E' : '#D7AC78', 1.1); },
   patch(c, f, S, t) {
     c.beginPath(); c.ellipse(0, 0, 56, 7, 0, Math.PI, 0); c.fillStyle = '#9C7A55'; c.fill(); c.strokeStyle = INK; c.lineWidth = 1.2; c.stroke();
     for (const fl of S.flowers) {
@@ -132,7 +132,7 @@ export const FX = {
     }
   },
   scaffold(c, f, S) {
-    if (!S.build) return; const p = S.build.p, n = 5;
+    if (!S.proj || S.proj.id !== 'floor' || S.proj.p >= 0.6) return; const p = S.proj.p / 0.6, n = 5;
     for (let i = 0; i < n; i++) { const x = -280 + i * 140, k = clamp(p * n * 1.2 - i * 0.2, 0, 1); if (k <= 0) continue; line(c, [x, 0, x, -100 * k], '#C9A26B', 4); line(c, [x, 0, x, -100 * k], INK, 0.6); }
     if (p > 0.3) line(c, [-280, -50, -280 + 560 * clamp((p - 0.3) / 0.3, 0, 1), -50], '#C9A26B', 3.5);
     if (p > 0.6) line(c, [-280, -100, -280 + 560 * clamp((p - 0.6) / 0.3, 0, 1), -100], '#C9A26B', 3.5);
@@ -206,6 +206,11 @@ export function drawProp(c, kind, t, w) {
     case 'pen': c.rotate(0.9 + bob * 0.15); line(c, [0, 6, 0, -8], '#2d3f6b', 2); break;
     case 'needles': c.translate(-w * 0.58, 6); circ(c, 0, 4, 5, '#E58F7B', 1.1); c.rotate(bob * 0.15); line(c, [-8, 4, 5, -9], '#aab', 1.6); line(c, [8, 4, -5, -9], '#aab', 1.6); break;
     case 'cup': c.translate(-2, 2); B(c, -4, -5, 8, 7, 2.5, '#fff', 1.1); break;
+    case 'shovel': c.rotate(0.3 + bob * 0.35); line(c, [0, -22, 0, 8], '#B98A5E', 2.2); B(c, -5, 8, 10, 10, [1, 1, 5, 5], '#9aa3a8', 1.1); break;
+    case 'hoe': c.rotate(0.35 + bob * 0.3); line(c, [0, -22, 0, 12], '#B98A5E', 2.2); B(c, -1, 10, 9, 4, 1, '#9aa3a8', 1.1); break;
+    case 'driver': c.rotate(-0.9 + bob * 0.25); line(c, [0, 0, 0, -12], '#8a9aa2', 1.8); B(c, -2.5, 0, 5, 9, 2, '#E8604C', 1); break;
+    case 'racket': c.rotate(0.5 + bob * 0.6); line(c, [0, 8, 0, -4], '#B98A5E', 2.4); c.beginPath(); c.ellipse(0, -12, 6.5, 8.5, 0, 0, 7); c.fillStyle = 'rgba(255,255,255,.5)'; c.fill(); c.strokeStyle = '#E8604C'; c.lineWidth = 1.8; c.stroke(); break;
+    case 'rod': c.rotate(0.75); line(c, [0, 6, 0, -40], '#8a5a3c', 1.8); c.rotate(-0.75); line(c, [27, -30, 27 + Math.sin(t * 1.5) * 1.5, 10], 'rgba(60,60,60,.6)', 0.8); c.beginPath(); c.arc(27, 12 + Math.sin(t * 2) * 1.5, 2.2, 0, 7); c.fillStyle = '#E8604C'; c.fill(); break;
     case 'bowl': c.translate(-w * 0.58, 12); c.beginPath(); c.arc(0, -6, 8, 0, Math.PI); c.closePath(); c.fillStyle = '#F6C177'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = INK; c.stroke(); break;
   }
   c.restore();

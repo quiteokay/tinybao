@@ -1,6 +1,7 @@
 // Puts the whole scene on the canvas: sky, garden, building, baos, lighting.
-import { RW, FH, COLS, W, SLAB, BAO, OUT, INK, LCOL, clock, clamp, lerp, darkness, seeded } from './core.js';
-import { ROOMS, ladderX, roofFloor, nFloors, weatherAt, roomAt } from './world.js';
+import { RW, FH, COLS, W, ROOMW, SLAB, BAO, OUT, INK, clock, clamp, lerp, darkness, seeded } from './core.js';
+import { ROOMS, stairX, roofFloor, nFloors, weatherAt, roomAt, ext, walled, WALLWIN } from './world.js';
+import { drawGrounds, drawBasement, drawPins, drawBallGames, drawStairwell, drawFlights, boatShape, LIGHTS } from './drawsites.js';
 import { drawBaoShape, bubble, icon } from './drawbao.js';
 import { FX, TH, B, drawCarry, drawProp } from './drawthings.js';
 import { R } from './sim.js';
@@ -61,14 +62,14 @@ function drawGround(c, V, S, t, d) {
   c.beginPath(); c.moveTo(L, 10);
   for (let x = Math.floor(L / 40) * 40; x <= Rr + 40; x += 40) c.lineTo(x, -34 - Math.sin(x / 210) * 22 - Math.sin(x / 83 + 2) * 8);
   c.lineTo(Rr, 10); c.closePath(); c.fill();
-  for (const tx of [-410, -330, -292, W + 300, W + 352, W + 440]) { c.fillStyle = '#8a6a4a'; c.fillRect(tx - 3, -50, 6, 30); c.fillStyle = S.snow > 0.5 ? '#DCEAEF' : '#7FC66F'; c.beginPath(); c.arc(tx, -66, 22, 0, 7); c.arc(tx - 13, -52, 15, 0, 7); c.arc(tx + 13, -52, 15, 0, 7); c.fill(); }
   c.fillStyle = '#8FD07F'; c.fillRect(L, 0, Rr - L, 600);
   c.fillStyle = '#7CC26C'; c.fillRect(L, 0, Rr - L, 5);
   if (S.snow > 0.02) { c.globalAlpha = S.snow; c.fillStyle = '#F6FBFD'; c.fillRect(L, -2 * S.snow, Rr - L, 600); c.globalAlpha = 1; }
   else { c.strokeStyle = '#6BB25C'; c.lineWidth = 1.4; c.beginPath(); for (let x = Math.floor(L / 46) * 46; x < Rr; x += 46) { if (x > -14 && x < W + 14) continue; c.moveTo(x, 0); c.lineTo(x - 3, -6); c.moveTo(x + 2, 0); c.lineTo(x + 5, -5); } c.stroke(); }
   // path to the door
-  c.fillStyle = S.snow > 0.5 ? '#E9E4DC' : '#E3CFA8'; c.beginPath(); c.roundRect(-OUT - 200, 1, OUT + 200, 7, 3); c.fill();
-  if (S.wet > 0.15 && S.snow < 0.1) { c.fillStyle = `rgba(150,200,235,${0.5 * S.wet})`; for (const px of [-150, -90, W + 150, W + 215]) { c.beginPath(); c.ellipse(px, 3, 22 * S.wet + 6, 3, 0, 0, 7); c.fill(); } }
+  c.fillStyle = S.snow > 0.5 ? '#E9E4DC' : '#E3CFA8'; c.beginPath(); c.roundRect(L - 100, 1, -L + 100, 7, 3); c.fill();
+  if (S.wet > 0.15 && S.snow < 0.1) { c.fillStyle = `rgba(150,200,235,${0.5 * S.wet})`; for (const px of [-190, -110, W + 150, W + 215]) { c.beginPath(); c.ellipse(px, 3, 22 * S.wet + 6, 3, 0, 0, 7); c.fill(); } }
+  drawGrounds(c, S, t);
   for (const sb of S.snowbaos) { c.save(); c.translate(sb.x, 0); c.fillStyle = '#fff'; c.strokeStyle = '#b9c8d2'; c.lineWidth = 1.5; drawBaoShape(c, { flavor: 'plain', acc: sb.acc, expr: 'content', size: 0.9 }, t); c.restore(); }
 }
 
@@ -146,6 +147,7 @@ function drawBao(c, S, b, t) {
   if (b.front === 'blanket') { c.save(); c.translate(b.x, floorY - b.alt); B(c, -27, -21, 52, 22, [8, 8, 4, 4], `hsl(${(b.ph * 60) | 0} 60% 80%)`); c.restore(); }
   else if (b.front === 'tub') { c.save(); c.translate(b.x, floorY); FX.tub(c, null, S, t, true); c.restore(); }
   else if (b.front === 'crib') { c.save(); c.translate(b.x, floorY); FX.crib(c, null, S, t, true); c.restore(); }
+  else if (b.front === 'boat') { c.save(); c.translate(b.x, floorY + Math.sin(t * 1.3) * 1.2); boatShape(c, true); c.restore(); }
   else if (b.front === 'box') { c.save(); c.translate(b.x, floorY); TH.box(c, null, S, t, true); c.restore(); }
   if (b.bubble) { const a = clamp(Math.min(b.bubble.t, b.bubble.T - b.bubble.t) * 5, 0, 1); bubble(c, X + 17 * sz, Y - h - 14, b.bubble.ic, a); }
 }
@@ -176,25 +178,39 @@ export function render(c, V, S, t) {
   drawGround(c, V, S, t, d);
   for (const f of R.fx) if (f.floor === 0 && (f.x < 0 || f.x > W) && FX[f.kind]) { c.save(); c.translate(f.x, 0); FX[f.kind](c, f, S, t); c.restore(); }
 
-  // which rooms have somebody awake in them (their lights are on)
+  // which rooms have somebody awake in them (their lights are on, if the floor is wired up)
   const lit = new Set();
-  for (const b of S.baos) if (!b.sleeping) { const r = roomAt(S, b.x, b.floor); if (r) lit.add(r.f + ',' + r.c); }
+  for (const b of S.baos) if (!b.sleeping) { const r = roomAt(S, b.x, b.floor); if (r && !S.nopower[r.f]) lit.add(r.f + ',' + r.c); if (b.floor < 0) lit.add('base'); }
   for (const o of S.objects) if (o.type === 'lamp' || (o.type === 'tv' && clock.t - (o.on || 0) < 600)) { const r = roomAt(S, o.x, o.floor); if (r) lit.add(r.f + ',' + r.c); }
   if (S.fire.fuel > 0) lit.add('0,1');
+  drawBasement(c, S, t, lit);
 
   // rooms
   for (let f = 0; f < nf; f++) for (let col = 0; col < COLS; col++) {
-    const type = S.floors[f][col], Rm = ROOMS[type], x0 = col * RW, y0 = -f * FH, top = y0 - FH + SLAB;
-    c.fillStyle = S.paint[f + ',' + col] || Rm.wall; c.fillRect(x0, top, RW, FH - SLAB);
-    c.fillStyle = 'rgba(255,255,255,.2)';
-    if ((f + col) % 2) for (let x = x0 + 12; x < x0 + RW; x += 24) c.fillRect(x, top, 7, FH - SLAB - 30);
-    else for (let yy = top + 14; yy < y0 - 36; yy += 18) for (let x = x0 + 10 + ((yy / 18) & 1) * 10; x < x0 + RW - 4; x += 20) { c.beginPath(); c.arc(x, yy, 2.2, 0, 7); c.fill(); }
-    c.fillStyle = Rm.dado; c.fillRect(x0, y0 - 30, RW, 30); c.fillStyle = 'rgba(58,42,34,.35)'; c.fillRect(x0, y0 - 31, RW, 1.4);
+    const type = S.floors[f][col], Rm = ROOMS[type], x0 = col * RW, y0 = -f * FH, top = y0 - FH + SLAB, bare = S.bare[f + ',' + col] != null;
+    c.fillStyle = bare ? '#E6E0D6' : S.paint[f + ',' + col] || Rm.wall; c.fillRect(x0, top, RW, FH - SLAB);
+    if (bare) {
+      // fresh plaster: trowel marks, a stepladder and a paint pot waiting
+      c.strokeStyle = 'rgba(120,110,100,.18)'; c.lineWidth = 1.2; for (let i = 0; i < 7; i++) { const px = x0 + 14 + i * 26, py = top + 18 + (i * 37) % 60; c.beginPath(); c.arc(px, py, 9, 0.3, 2.2); c.stroke(); }
+      c.strokeStyle = '#B98A5E'; c.lineWidth = 2.2; c.beginPath(); c.moveTo(x0 + 118, y0); c.lineTo(x0 + 130, y0 - 44); c.lineTo(x0 + 142, y0); c.moveTo(x0 + 122, y0 - 14); c.lineTo(x0 + 138, y0 - 14); c.moveTo(x0 + 126, y0 - 28); c.lineTo(x0 + 134, y0 - 28); c.stroke();
+      B(c, x0 + 150, y0 - 11, 12, 11, 2, '#C9D2D8', 1.1); B(c, x0 + 149, y0 - 13, 14, 3, 1, Rm.wall, 1);
+    } else {
+      c.fillStyle = 'rgba(255,255,255,.2)';
+      if ((f + col) % 2) for (let x = x0 + 12; x < x0 + RW; x += 24) c.fillRect(x, top, 7, FH - SLAB - 30);
+      else for (let yy = top + 14; yy < y0 - 36; yy += 18) for (let x = x0 + 10 + ((yy / 18) & 1) * 10; x < x0 + RW - 4; x += 20) { c.beginPath(); c.arc(x, yy, 2.2, 0, 7); c.fill(); }
+      c.fillStyle = Rm.dado; c.fillRect(x0, y0 - 30, RW, 30); c.fillStyle = 'rgba(58,42,34,.35)'; c.fillRect(x0, y0 - 31, RW, 1.4);
+    }
     c.fillStyle = 'rgba(90,60,40,.16)'; c.fillRect(x0, y0 - 3, RW, 3);
-    drawWindow(c, x0 + Rm.win, y0 - 46, skyCol, d, Rm.dado);
-    drawMarks(c, S, f, col, x0, y0, type, t);
+    drawWindow(c, x0 + Rm.win, y0 - 46, skyCol, d, bare ? '#D8D2C8' : Rm.dado);
+    if (!bare) drawMarks(c, S, f, col, x0, y0, type, t);
+    // the light: a bare wire until the floor is wired up
+    const lx = x0 + (Rm.win > 95 ? 44 : 150);
+    c.strokeStyle = INK; c.lineWidth = 1; c.beginPath(); c.moveTo(lx, top); c.lineTo(lx, top + (S.nopower[f] ? 8 : 12)); c.stroke();
+    if (S.nopower[f]) { c.beginPath(); c.moveTo(lx, top + 8); c.quadraticCurveTo(lx + 5, top + 12, lx + 2, top + 16); c.stroke(); }
+    else { const on = d > 0.25 && lit.has(f + ',' + col); c.beginPath(); c.moveTo(lx - 7, top + 20); c.lineTo(lx - 4, top + 12); c.lineTo(lx + 4, top + 12); c.lineTo(lx + 7, top + 20); c.closePath(); c.fillStyle = on ? '#FFE9A8' : '#E4DCCB'; c.fill(); c.lineWidth = 1.2; c.stroke(); if (on) LIGHTS.push({ x: lx, y: top + 22, r: 60 }); }
     if (col > 0) { c.fillStyle = '#EAD7BF'; c.strokeStyle = INK; c.lineWidth = 1.3; c.beginPath(); c.roundRect(x0 - 3, top - 1, 6, FH - SLAB - 50, [0, 0, 3, 3]); c.fill(); c.stroke(); }
   }
+  drawStairwell(c, S, nf);
   // floor slabs, outer walls, roof
   c.fillStyle = '#E9D5BC'; c.strokeStyle = INK; c.lineWidth = 1.6;
   for (let f = 0; f <= nf; f++) { c.fillStyle = '#EAD7BF'; c.beginPath(); c.rect(-8, -f * FH, W + 16, SLAB); c.fill(); c.stroke(); }
@@ -207,8 +223,10 @@ export function render(c, V, S, t) {
   if (S.snow > 0.05) { c.globalAlpha = S.snow; B(c, -14, topY - 10, W + 28, 6, 3, '#fff', 0); B(c, chx - 15, topY - 54, 30, 5, 2, '#fff', 0); c.globalAlpha = 1; }
 
   // ladders, furniture
-  for (let f = 0; f < nf; f++) drawLadder(c, ladderX(f), -f * FH, -(f + 1) * FH - 14);
-  for (const f of R.fx) if (FX[f.kind] && !(f.floor === 0 && (f.x < 0 || f.x > W))) { c.save(); c.translate(f.x, -f.floor * FH); FX[f.kind](c, f, S, t); c.restore(); }
+  drawFlights(c, S, nf); drawLadder(c, stairX(nf - 1), -(nf - 1) * FH, -nf * FH - 14);
+  drawPins(c, S, t);
+  const drag = R.drag;
+  for (const f of R.fx) if (FX[f.kind] && !(f.floor === 0 && (f.x < 0 || f.x > W)) && !(drag && f.mid === drag.mid)) { c.save(); c.translate(f.x, -f.floor * FH); FX[f.kind](c, f, S, t); c.restore(); }
   for (const m of S.mess) { const y = -m.floor * FH;
     if (m.kind === 'crumbs') { c.fillStyle = '#C99A5B'; for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(m.x - 8 + i * 3.2 + (i % 2), y - 1.5 - (i % 3) * 0.8, 1.3, 0, 7); c.fill(); } }
     else if (m.kind === 'puddle') { c.fillStyle = 'rgba(140,200,240,.75)'; c.beginPath(); c.ellipse(m.x, y - 1, 13, 2.6, 0, 0, 7); c.fill(); }
@@ -221,6 +239,19 @@ export function render(c, V, S, t) {
   for (const o of S.objects) if (!o.heldBy && !o.held && o.type !== 'rug') drawObj(o);
   const order = S.baos.filter((b) => !b.held).sort((a, b2) => (a.carriedBy ? 1 : 0) - (b2.carriedBy ? 1 : 0) || (a.front ? 0 : 1) - (b2.front ? 0 : 1));
   for (const b of order) drawBao(c, S, b, t);
+  drawBallGames(c, S, t);
+  // rooms with a front wall: only the window shows what is inside
+  for (let f = 0; f < nf; f++) for (let col = 0; col < COLS; col++) if (walled(S, f, col) && S.bare[f + ',' + col] == null) {
+    const [wl, wr] = WALLWIN[S.floors[f][col]], x0 = col * RW, y0 = -f * FH, top = y0 - FH + SLAB, sill = y0 - 9, wt = y0 - 94;
+    c.beginPath(); c.rect(x0, top, RW, FH - SLAB); c.roundRect(x0 + wl, wt, wr - wl, sill - wt, 6); c.fillStyle = '#F2C9A4'; c.fill('evenodd');
+    c.strokeStyle = 'rgba(160,110,70,.3)'; c.lineWidth = 1; for (let yy = top + 12; yy < y0; yy += 12) { c.beginPath(); c.moveTo(x0, yy); c.lineTo(x0 + wl, yy); c.moveTo(x0 + wr, yy); c.lineTo(x0 + RW, yy); if (yy < wt || yy > sill) { c.moveTo(x0 + wl, yy); c.lineTo(x0 + wr, yy); } c.stroke(); }
+    c.fillStyle = 'rgba(190,230,255,.13)'; c.fillRect(x0 + wl, wt, wr - wl, sill - wt);
+    c.strokeStyle = '#fff'; c.lineWidth = 5; c.beginPath(); c.roundRect(x0 + wl, wt, wr - wl, sill - wt, 6); c.stroke();
+    c.lineWidth = 1.6; c.beginPath(); c.moveTo(x0 + (wl + wr) / 2, wt); c.lineTo(x0 + (wl + wr) / 2, sill); c.stroke();
+    c.strokeStyle = INK; c.lineWidth = 1.3; c.beginPath(); c.roundRect(x0 + wl - 2.5, wt - 2.5, wr - wl + 5, sill - wt + 5, 7); c.stroke();
+    B(c, x0 + wl - 6, sill + 1, wr - wl + 12, 5, 2, '#fff', 1.2);
+    if (S.floors[f][col] === 'bathroom') { B(c, x0 + wl + 6, sill + 5, 40, 8, 2, '#C9785A', 1.1); for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(x0 + wl + 12 + i * 9, sill + 3, 3.4, 0, 7); c.fillStyle = ['#FF8FB1', '#FFD166', '#FF8FB1', '#B58BD9'][i]; c.fill(); } }
+  }
 
   // night: unlit rooms go dark, the garden dims
   if (d > 0.02) {
@@ -235,15 +266,18 @@ export function render(c, V, S, t) {
     c.fillStyle = fade(-110, -30);
     c.fillRect(V.wx0 - 60, -110, -9 - (V.wx0 - 60), 80); c.fillRect(W + 9, -110, V.wx1 + 60 - (W + 9), 80);
     c.fillStyle = dk(d * 0.5);
-    c.fillRect(V.wx0 - 60, -30, -9 - (V.wx0 - 60), 900); c.fillRect(W + 9, -30, V.wx1 + 60 - (W + 9), 900); c.fillRect(-9, SLAB + 5, W + 18, 900);
+    c.fillRect(V.wx0 - 60, -30, -9 - (V.wx0 - 60), 900); c.fillRect(W + 9, -30, V.wx1 + 60 - (W + 9), 900);
+    if (S.basement) { c.fillStyle = dk(d * (lit.has('base') ? 0.1 : 0.5)); c.fillRect(-9, SLAB + 5, W + 18, FH + 4); c.fillStyle = dk(d * 0.5); c.fillRect(-9, FH + SLAB + 9, W + 18, 900); } else c.fillRect(-9, SLAB + 5, W + 18, 900);
     c.fillStyle = fade(topY - 90, topY - 20); c.fillRect(-16, topY - 90, W + 32, 70);
     c.fillStyle = dk(d * 0.5); c.fillRect(-16, topY - 20, W + 32, 13);
     c.globalCompositeOperation = 'lighter';
     if (S.fire.fuel > 0) { const fp = R.fx.find((f) => f.kind === 'fireplace'); if (fp) { const fl = 0.8 + Math.sin(t * 11) * 0.08, g = c.createRadialGradient(fp.x, -18, 4, fp.x, -18, 120); g.addColorStop(0, `rgba(255,150,60,${0.38 * d * fl})`); g.addColorStop(1, 'rgba(255,150,60,0)'); c.fillStyle = g; c.fillRect(RW, -FH + SLAB, RW, FH - SLAB); } }
+    for (const L of LIGHTS) { const g = c.createRadialGradient(L.x, L.y, 2, L.x, L.y, L.r); g.addColorStop(0, `rgba(${L.col || '255,225,150'},${0.42 * d})`); g.addColorStop(1, `rgba(${L.col || '255,225,150'},0)`); c.fillStyle = g; c.fillRect(L.x - L.r, L.y - L.r, L.r * 2, L.r * 2); }
     for (const o of S.objects) if (o.type === 'lamp' && !o.held) { const y = -o.floor * FH - 50, g = c.createRadialGradient(o.x, y, 3, o.x, y, 80); g.addColorStop(0, `rgba(255,225,150,${0.4 * d})`); g.addColorStop(1, 'rgba(255,225,150,0)'); c.fillStyle = g; c.fillRect(o.x - 80, y - 80, 160, 160); }
     c.globalCompositeOperation = 'source-over';
   }
   // whatever the visitor is holding is drawn on top of everything
+  if (drag) for (const f of R.fx) if (f.mid === drag.mid && FX[f.kind]) { c.save(); c.translate(drag.x, -drag.h); c.rotate(Math.sin(t * 9) * 0.03); FX[f.kind](c, f, S, t); c.restore(); }
   for (const o of S.objects) if (o.held) drawObj(o);
   for (const b of S.baos) if (b.held) drawBao(c, S, b, t);
   drawParts(c);
