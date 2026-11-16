@@ -11,7 +11,7 @@
   :root {
     --bg: #f4f1ea; --ink: #1c1b19; --muted: #6d685f; --line: #2a2926;
     --cell: #ffffff; --block: #1c1b19; --word: #cfe6f7; --cursor: #ffd84d;
-    --good: #1d7a46; --bad: #c0392b; --badbg: #fde4e0; --panel: #ffffff; --key: #e3dfd6; --pencil: #8a8a8a;
+    --good: #1d7a46; --bad: #c0392b; --badbg: #fbdada; --revbg: #dcf1df; --panel: #ffffff; --key: #e3dfd6; --pencil: #8a8a8a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: var(--bg); color: var(--ink); }
@@ -43,11 +43,10 @@
   .c .n { position: absolute; top: 2cqw; left: 5cqw; font: 26cqw/1 system-ui, sans-serif; color: #444; }
   .c .l { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6cqw; font: 600 62cqw/1 system-ui, sans-serif; text-transform: uppercase; }
   .c.p .l { color: var(--pencil); }
-  .c.ok .l { color: var(--good); }
   .c.bad { background: var(--badbg); }
-  .c.bad.cur { background: var(--cursor); }
-  .c.bad .l { color: var(--bad); }
-  .c .was { position: absolute; top: 2cqw; right: 6cqw; font: 26cqw/1 system-ui, sans-serif; color: var(--bad); text-decoration: line-through; }
+  .c.rev { background: var(--revbg); }
+  .c.cur { background: var(--cursor); }
+
   .actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
   .actions button { padding: 10px 16px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); font-family: system-ui, sans-serif; font-size: 15px; font-weight: 600; }
   .actions button.primary { background: var(--ink); color: #fff; }
@@ -59,8 +58,7 @@
   .lists li b { flex: 0 0 24px; text-align: right; font-family: system-ui, sans-serif; font-size: 13px; padding-top: 1px; }
   .lists li.on { background: var(--word); }
   .lists li.done span { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
-  .lists li .ans { display: inline-block; width: 100%; font-family: system-ui, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-decoration: none; }
-  .lists li .ans.g { color: var(--good); } .lists li .ans.r { color: var(--bad); }
+
   #kb { display: none; }
   @media (min-width: 900px) {
     .wrap { grid-template-columns: minmax(0, 620px) minmax(0, 1fr); align-items: start; }
@@ -85,7 +83,7 @@
   .kr button.wide { flex: 1.6 1 0; max-width: 70px; font-size: 14px; }
   .kr button:active { background: #b9b4a8; }
   .kr button.on { background: var(--pencil); color: #fff; }
-  #keep { display: none; }
+
   #modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(20,18,15,.6); align-items: center; justify-content: center; padding: 20px; }
   #modal.open { display: flex; }
   #modal .card { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 26px 22px 22px; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
@@ -103,7 +101,7 @@
     <button id="menubtn" aria-label="Menu" aria-haspopup="true" title="Menu"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <div id="menu">
       <button id="reveal">Reveal letter</button>
-      <button id="check">Check it</button>
+      <button id="mistakes">Reveal mistakes</button>
       <button id="clear">Start over</button>
     </div>
   </div>
@@ -120,7 +118,7 @@
     </div>
     <div id="grid"></div>
     <div class="actions">
-      <button id="keep" class="primary">Keep solving</button>
+
       <div id="status"></div>
     </div>
   </div>
@@ -152,7 +150,7 @@ GUILDER:"Country across the sea, sworn enemy of 66-Across", AMEN:"\"You said it!
 CLIFFSOFINSANITY:"Sheer obstacle that Fezzik climbs with three passengers",
 OAR:"Rowboat need", RILES:"Irritates", ANTS:"Picnic crashers",
 PREPARE:"\"___ to die\" (end of Inigo Montoya's famous greeting)", SPICE:"Cumin or cardamom",
-AMSO:"Playground comeback", AMAT:"Third of a Latin 101 trio", FAR:"A long way off",
+AMSO:"\"I ___ hungry I could eat a horse\" (2 wds.)", AMAT:"Latin for \"she loves\"", FAR:"A long way off",
 PRINCESSBRIDE:"With \"The,\" 1987 fairy-tale film celebrated in this puzzle",
 STOLENON:"Crept up to unnoticed, old-style (2 wds.)", SALINAS:"Steinbeck's California hometown",
 PINAFORE:"Gilbert and Sullivan's \"H.M.S. ___\"", AGESAGO:"Way back when (2 wds.)",
@@ -166,7 +164,7 @@ GIN:"Martini base", USS:"Letters before Enterprise", ISAAC:"Newton or Asimov", A
 MISSME:"Question from someone back from a long trip (2 wds.)", COPA:"Manilow hot spot, with \"the\"", SIR:"Knight's title",
 OLE:"Bullring cheer", NNE:"Opposite of SSW", POPLAR:"Tall, fast-growing tree", PASSAT:"Volkswagen sedan",
 ITSAGO:"\"We're all set!\" (3 wds.)", ACNE:"Teen's skin woe", FINAL:"End-of-semester exam", ADAGE:"Old saying",
-RESOD:"Patch, as a lawn", REFI:"New home loan, for short", INON:"Privy to (2 wds.)", NOR:"Neither's partner",
+RESOD:"Add grass to again", REFI:"New home loan, for short", INON:"Privy to (2 wds.)", NOR:"Neither's partner",
 BLEW:"Squandered, as a lead", RISE:"Get out of bed", SPF:"Sunscreen letters", TIL:"Up to, briefly", ONO:"Yoko of music"
 };
 const H = ROWS.length, W = ROWS[0].length, KEY = "tinybao-puzzle-asyouwish-v1";
@@ -189,9 +187,9 @@ words.forEach((w, i) => {
   w.cells.forEach(([r, c]) => { (at[r + "," + c] = at[r + "," + c] || {})[w.dir] = i; });
 });
 
-let fill = {}, pen = {}, pencil = false, cur = { r: 0, c: 0, dir: "a" }, checked = false;
-try { const s = JSON.parse(localStorage.getItem(KEY) || "{}"); fill = s.fill || {}; pen = s.pen || {}; pencil = !!s.pencil; if (s.cur) cur = s.cur; } catch (e) {}
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ fill, pen, pencil, cur })); } catch (e) {} };
+let fill = {}, pen = {}, bad = {}, rev = {}, pencil = false, cur = { r: 0, c: 0, dir: "a" };
+try { const s = JSON.parse(localStorage.getItem(KEY) || "{}"); fill = s.fill || {}; pen = s.pen || {}; bad = s.bad || {}; rev = s.rev || {}; pencil = !!s.pencil; if (s.cur) cur = s.cur; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ fill, pen, bad, rev, pencil, cur })); } catch (e) {} };
 const $ = id => document.getElementById(id);
 const get = (r, c) => fill[r + "," + c] || "";
 const wordAt = () => words[at[cur.r + "," + cur.c][cur.dir]];
@@ -227,7 +225,7 @@ function move(dr, dc) {
   if (r >= 0 && c >= 0 && r < H && c < W) { cur.r = r; cur.c = c; if (at[r + "," + c][cur.dir] === undefined) flip(); }
 }
 function type(ch) {
-  if (checked) uncheck();
+  delete bad[cur.r + "," + cur.c]; delete rev[cur.r + "," + cur.c];
   fill[cur.r + "," + cur.c] = ch;
   if (pencil) pen[cur.r + "," + cur.c] = 1; else delete pen[cur.r + "," + cur.c];
   const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
@@ -237,12 +235,12 @@ function type(ch) {
   else step(1);
 }
 function back() {
-  if (checked) uncheck();
+
   const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
   if (!get(cur.r, cur.c) && k > 0) { cur.r = w.cells[k - 1][0]; cur.c = w.cells[k - 1][1]; }
-  delete fill[cur.r + "," + cur.c]; delete pen[cur.r + "," + cur.c];
+  delete fill[cur.r + "," + cur.c]; delete pen[cur.r + "," + cur.c]; delete bad[cur.r + "," + cur.c]; delete rev[cur.r + "," + cur.c];
 }
-function uncheck() { checked = false; }
+
 let wasFull = null, wasSolved = null;
 function popup(emo, title, text, btn) { $("memo").textContent = emo; $("mtitle").textContent = title; $("mtext").textContent = text; $("mok").textContent = btn; $("modal").classList.add("open"); $("mok").focus(); }
 function closePopup() { $("modal").classList.remove("open"); $("mok").blur(); }
@@ -254,29 +252,23 @@ function render() {
     if (sol(r, c) === "#") continue;
     const d = cells[r][c], v = get(r, c), k = r + "," + c, good = v === sol(r, c);
     total++; if (v) filled++; if (good) right++;
-    d.className = "c" + (inw.has(k) ? " w" : "") + (r === cur.r && c === cur.c ? " cur" : "") + (checked ? (good ? " ok" : " bad") : (pen[k] ? " p" : ""));
-    d.querySelector(".l").textContent = checked ? sol(r, c) : v;
-    let was = d.querySelector(".was");
-    if (checked && v && !good) { if (!was) { was = document.createElement("span"); was.className = "was"; d.appendChild(was); } was.textContent = v; }
-    else if (was) was.remove();
+    d.className = "c" + (inw.has(k) ? " w" : "") + (pen[k] ? " p" : "") + (bad[k] ? " bad" : "") + (rev[k] ? " rev" : "") + (r === cur.r && c === cur.c ? " cur" : "");
+    d.querySelector(".l").textContent = v;
+
   }
-  let wr = 0;
+
   words.forEach(x => {
-    const mine = x.cells.map(([r, c]) => get(r, c)).join(""), ok = mine === x.ans; if (ok) wr++;
+
     x.li.className = (x === w ? "on " : "") + (isDone(x) ? "done" : "");
-    let a = x.li.querySelector(".ans");
-    if (checked) { if (!a) { a = document.createElement("span"); a.className = "ans"; x.li.querySelector("span").appendChild(a); } a.className = "ans " + (ok ? "g" : "r"); a.textContent = (ok ? "✓ " : "✗ ") + x.ans; }
-    else if (a) a.remove();
+
   });
   $("cluetxt").innerHTML = `<b>${w.num}${w.dir === "a" ? "A" : "D"}</b><span></span>`; $("cluetxt").lastChild.textContent = w.clue;
-  $("check").textContent = checked ? "Keep solving" : "Check it";
-  $("keep").style.display = checked ? "block" : "none";
+
   document.querySelectorAll("#pencil, .kr .pk").forEach(b => { b.classList.toggle("on", pencil); b.setAttribute("aria-pressed", pencil); });
-  $("status").textContent = checked
-    ? (right === total ? "Perfect. Have fun storming the castle!" : `${wr} of ${words.length} answers right · ${total - right} squares to fix (correct letters shown in red)`)
-    : (right === total ? "Solved! Have fun storming the castle!" : `${filled} of ${total} squares filled`);
+  $("status").textContent = right === total ? "Solved! Have fun storming the castle!" : `${filled} of ${total} squares filled`;
+
   const full = filled === total, solved = right === total;
-  if (wasFull !== null && !checked) {
+  if (wasFull !== null) {
     if (solved && !wasSolved) popup("\u{1F478}", "You found the princess!", "Every square is correct. That was true love, or at least true spelling. Have fun storming the castle!", "See the finished puzzle");
     else if (full && !solved && !wasFull) popup("\u{1F573}\uFE0F", "Not quite\u2026", "At least one letter is incorrect, but don't fall into the Pit of Despair. Keep going until you see the princess.", "Okay");
   }
@@ -291,10 +283,16 @@ const closeMenu = () => $("menu").classList.remove("open");
 $("menubtn").onclick = e => { e.stopPropagation(); $("menu").classList.toggle("open"); e.currentTarget.blur(); };
 document.addEventListener("click", closeMenu);
 $("pencil").onclick = e => { pencil = !pencil; e.currentTarget.blur(); render(); };
-$("check").onclick = () => { if (!checked && !confirm("Check your answers?\n\nThis shows the correct letter in every wrong or empty square. Your own entries are kept, and you can go back to solving afterwards.")) return; checked = !checked; render(); };
-$("keep").onclick = () => { checked = false; render(); };
-$("reveal").onclick = () => { checked = false; const k = cur.r + "," + cur.c; fill[k] = sol(cur.r, cur.c); delete pen[k]; render(); };
-$("clear").onclick = () => { if (confirm("Start over?\n\nThis erases every letter you have entered, including pencil marks. It cannot be undone.")) { fill = {}; pen = {}; checked = false; cur = { r: 0, c: 0, dir: "a" }; render(); } };
+$("mistakes").onclick = () => {
+  if (!confirm("Reveal mistakes?\n\nEvery square holding a wrong letter will turn pink. The correct letters stay hidden, and empty squares are not marked.")) return;
+  let n = 0;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const k = r + "," + c, v = get(r, c); if (v && v !== sol(r, c)) { bad[k] = 1; n++; } }
+  render();
+  if (!n) popup("\u2728", "No mistakes so far", "Every letter you have entered is correct. Keep going!", "Okay");
+};
+
+$("reveal").onclick = () => { const k = cur.r + "," + cur.c; fill[k] = sol(cur.r, cur.c); delete pen[k]; delete bad[k]; rev[k] = 1; render(); };
+$("clear").onclick = () => { if (confirm("Start over?\n\nThis erases every letter you have entered, including pencil marks. It cannot be undone.")) { fill = {}; pen = {}; bad = {}; rev = {}; cur = { r: 0, c: 0, dir: "a" }; render(); } };
 $("cluetxt").onclick = () => { flip(); render(); };
 
 $("mok").onclick = e => { e.stopPropagation(); closePopup(); };
