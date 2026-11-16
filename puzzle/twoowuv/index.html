@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-title" content="tiny bao puzzle">
+<link rel="apple-touch-icon" href="/lilbao_351.png">
+<link rel="icon" type="image/png" href="/lilbao_351.png">
+<title>Anybody Want a Peanut? &#129372;</title>
+<meta name="description" content="A crossword for anyone who has ever stormed a castle.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="tiny bao">
+<meta property="og:title" content="Anybody Want a Peanut? &#129372;">
+<meta property="og:description" content="A crossword for anyone who has ever stormed a castle.">
+<meta property="og:url" content="https://www.tinybao.com/puzzle/twoowuv/">
+<meta property="og:image" content="https://www.tinybao.com/puzzle/twoowuv/preview.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="An empty crossword grid titled Anybody Want a Peanut?">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root {
+    --bg: #f4f1ea; --ink: #1c1b19; --muted: #6d685f; --line: #2a2926;
+    --cell: #ffffff; --block: #1c1b19; --word: #cfe6f7; --cursor: #ffd84d;
+    --good: #1d7a46; --bad: #c0392b; --badbg: #fbdada; --revbg: #dcf1df; --panel: #ffffff; --key: #e3dfd6; --pencil: #8a8a8a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: Georgia, "Times New Roman", serif; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  header { text-align: center; padding: 18px 110px 8px; position: relative; }
+  .tools { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
+  .tools > button { display: flex; align-items: center; justify-content: center; padding: 0; width: 42px; height: 42px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); font: 20px/1 system-ui, sans-serif; }
+  .tools > button.on { background: var(--pencil); color: #fff; }
+  #menu { display: none; position: absolute; top: 48px; right: 0; z-index: 20; background: var(--panel); border: 2px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 170px; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+  #menu.open { display: block; }
+  #menu button { display: block; width: 100%; text-align: left; padding: 13px 16px; border: 0; background: transparent; font: 600 15px system-ui, sans-serif; }
+  #menu button + button { border-top: 1px solid #ddd; }
+  #menu button:hover { background: var(--word); }
+  header h1 { font-size: 28px; letter-spacing: .5px; }
+  header p { color: var(--muted); font-size: 14px; margin-top: 4px; font-style: italic; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 12px 24px; display: grid; gap: 18px; grid-template-columns: 1fr; }
+  .board { min-width: 0; }
+  .cluebar { display: flex; align-items: stretch; background: var(--word); border: 2px solid var(--line); border-radius: 8px; overflow: hidden; min-height: 56px; }
+  .cluebar button { flex: 0 0 48px; background: transparent; border: 0; font-size: 26px; font-family: system-ui, sans-serif; }
+  .cluebar button:active { background: rgba(0,0,0,.12); }
+  .cluebar .txt { flex: 1; display: flex; align-items: center; padding: 6px 4px; font-size: 16px; line-height: 1.25; }
+  .cluebar .txt b { margin-right: 8px; white-space: nowrap; font-family: system-ui, sans-serif; font-size: 14px; }
+  #grid { display: grid; grid-template-columns: repeat(16, 1fr); border: 2px solid var(--line); background: var(--line); gap: 1px; user-select: none; -webkit-user-select: none; }
+  .c { position: relative; background: var(--cell); aspect-ratio: 1; container-type: inline-size; cursor: pointer; }
+  .c.b { background: var(--block); cursor: default; }
+  #gridwrap { position: relative; margin-top: 10px; }
+  #cliffs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; mix-blend-mode: multiply; transition: opacity 2.5s ease; }
+  #gridwrap.solved #cliffs { opacity: .62; }
+  #gridwrap.solved .c.w, #gridwrap.solved .c.cur { background: var(--cell); }
+  .c.w { background: var(--word); }
+  .c.cur { background: var(--cursor); }
+  .c .n { position: absolute; top: 2cqw; left: 5cqw; font: 26cqw/1 system-ui, sans-serif; color: #444; }
+  .c .l { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6cqw; font: 600 62cqw/1 system-ui, sans-serif; text-transform: uppercase; }
+  .c.p .l { color: var(--pencil); }
+  .c.bad { background: var(--badbg); }
+  .c.rev { background: var(--revbg); }
+  .c.cur { background: var(--cursor); }
+
+  .actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .actions button { padding: 10px 16px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); font-family: system-ui, sans-serif; font-size: 15px; font-weight: 600; }
+  .actions button.primary { background: var(--ink); color: #fff; }
+  #status { font-family: system-ui, sans-serif; font-size: 15px; flex: 1 1 200px; }
+  .lists { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-width: 0; }
+  .lists h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 2px solid var(--line); padding-bottom: 4px; margin-bottom: 4px; font-family: system-ui, sans-serif; }
+  .lists ol { list-style: none; }
+  .lists li { display: flex; gap: 6px; padding: 5px 6px; font-size: 15px; line-height: 1.3; border-radius: 4px; cursor: pointer; }
+  .lists li b { flex: 0 0 24px; text-align: right; font-family: system-ui, sans-serif; font-size: 13px; padding-top: 1px; }
+  .lists li.on { background: var(--word); }
+  .lists li.done span { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
+
+  #kb { display: none; }
+  @media (min-width: 900px) {
+    .wrap { grid-template-columns: minmax(0, 620px) minmax(0, 1fr); align-items: start; }
+    .lists { max-height: calc(100vh - 110px); overflow: auto; padding-right: 6px; }
+    .board { position: sticky; top: 10px; }
+  }
+  @media (max-width: 899px) {
+    header { padding: 14px 104px 8px 12px; text-align: left; } .tools { top: 8px; right: 8px; } header h1 { font-size: 22px; } header p { font-size: 13px; }
+    .wrap { padding: 0 6px 24px; }
+    .lists li { font-size: 14px; }
+  }
+  /* touch layout: clue bar and keyboard pinned to the bottom */
+  body.touch .wrap { padding-bottom: 250px; }
+  body.touch #pencil { display: none; }
+  body.touch header { padding: 9px 56px 3px 10px; }
+  body.touch header h1 { font-size: 20px; }
+  body.touch .tools { top: 4px; right: 6px; }
+  body.touch .tools > button { width: 36px; height: 36px; }
+  body.touch .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--bg); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -2px 10px rgba(0,0,0,.15); }
+  body.touch .cluebar { border-radius: 6px; min-height: 52px; }
+  body.touch #kb { display: block; margin-top: 6px; }
+  body.touch #gridwrap { margin-top: 4px; }
+  .kr { display: flex; justify-content: center; gap: 4px; margin-top: 5px; }
+  .kr button { flex: 1 1 0; max-width: 44px; height: 44px; border: 0; border-radius: 5px; background: var(--key); font: 600 17px system-ui, sans-serif; }
+  .kr button.wide { flex: 1.6 1 0; max-width: 70px; font-size: 14px; }
+  .kr button:active { background: #b9b4a8; }
+  .kr button.on { background: var(--pencil); color: #fff; }
+
+  #modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(20,18,15,.6); align-items: center; justify-content: center; padding: 20px; }
+  #modal.open { display: flex; }
+  #modal .card { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 26px 22px 22px; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  #modal .emo { font-size: 64px; line-height: 1; }
+  #modal h2 { font-size: 24px; margin: 12px 0 8px; }
+  #modal p { font-size: 17px; line-height: 1.4; color: #3a3833; }
+  #modal button { margin-top: 18px; padding: 12px 26px; border: 2px solid var(--line); border-radius: 8px; background: var(--ink); color: #fff; font: 600 16px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Anybody Want a Peanut? &#129372;</h1>
+  <div class="tools">
+    <button id="pencil" aria-label="Pencil mode" aria-pressed="false" title="Pencil">&#9998;</button>
+    <button id="menubtn" aria-label="Menu" aria-haspopup="true" title="Menu"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <div id="menu">
+      <button id="reveal">Reveal letter</button>
+      <button id="mistakes">Reveal mistakes</button>
+      <button id="clear">Start over</button>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+  <div class="board">
+    <div class="dock">
+      <div class="cluebar">
+        <button id="prev" aria-label="Previous unfinished clue">&lsaquo;</button>
+        <div class="txt" id="cluetxt"></div>
+        <button id="next" aria-label="Next unfinished clue">&rsaquo;</button>
+      </div>
+      <div id="kb"></div>
+    </div>
+    <div id="gridwrap">
+      <div id="grid"></div>
+      <svg id="cliffs" viewBox="0 0 150 160" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fa8d6"/><stop offset=".7" stop-color="#f3c9a0"/><stop offset="1" stop-color="#f6dcc0"/></linearGradient>
+          <linearGradient id="rock" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8c7a68"/><stop offset="1" stop-color="#4f4439"/></linearGradient>
+        </defs>
+        <rect width="150" height="160" fill="url(#sky)"/>
+        <circle cx="28" cy="30" r="9" fill="#fff6d8"/>
+        <path d="M0 132h150v28H0z" fill="#3f6f93"/>
+        <path d="M0 138q8-3 16 0t16 0 16 0 16 0v2H0z" fill="#6d9dbd" opacity=".7"/>
+        <path d="M6 150q8-3 16 0t16 0 16 0v2H6z" fill="#6d9dbd" opacity=".6"/>
+        <path d="M150 12h-30l-6 3-12-2-9 4-7-1-5 5 2 14-4 12 3 15-5 13 4 16-3 14 5 12-4 13 3 12h68z" fill="url(#rock)"/>
+        <path d="M81 21l3 14-4 12 3 15-5 13 4 16-3 14 5 12-4 13 3 12 9 0-2-14 4-13-5-12 3-15-4-15 4-14-3-13 3-12-2-13z" fill="#a8947f"/>
+        <path d="M100 30l4 20-3 22 5 24-4 26 3 20M118 22l-3 26 5 24-4 30 4 28M134 18l3 30-4 34 5 30-3 26" stroke="#3d342b" stroke-width="1.2" fill="none" opacity=".55"/>
+        <path d="M84 17q1 55-1 118" stroke="#2c2620" stroke-width=".7" fill="none"/>
+        <path d="M150 12h-30l-6 3-12-2-9 4-7-1-5 5q20-4 34-3t35 2z" fill="#6f8a4f"/>
+        <path d="M30 128h18l-3 5H33zM38 128v-14M38 114l8 10h-8zM38 116l-6 8h6z" fill="#2f2a26"/>
+      </svg>
+    </div>
+    <div class="actions">
+
+      <div id="status"></div>
+    </div>
+  </div>
+  <div class="lists">
+    <div><h2>Across</h2><ol id="la"></ol></div>
+    <div><h2>Down</h2><ol id="ld"></ol></div>
+  </div>
+</div>
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+  <div class="card">
+    <div class="emo" id="memo"></div>
+    <h2 id="mtitle"></h2>
+    <p id="mtext"></p>
+    <button id="mok"></button>
+  </div>
+</div>
+<script>
+const ORIG = [
+"ADDEDON###TORTES","NIAGARA#PERVERSE","TANGRAM#AVIATION","INCONCEIVABLE###",
+"CEE##LIME###LAMP","###DIETS#GUILDER","#AMEN##AMISS#MEA","CLIFFSOFINSANITY",
+"OAR#RILES##ANTS#","PREPARE#SPICE###","AMSO###AMAT##FAR","###PRINCESSBRIDE",
+"STOLENON#SALINAS","PINAFORE#AGESAGO","FLORIN###TOWELED"];
+const CLUES = {
+ADDEDON:"Tacked at the end", TORTES:"Rich layered cakes", NIAGARA:"Falls for honeymooners?", PERVERSE:"Stubbornly contrary",
+TANGRAM:"Seven-piece puzzle from China", AVIATION:"Flying field?",
+INCONCEIVABLE:"Vizzini's favorite word, which may not mean what he thinks it means",
+CEE:"Middling grade", LIME:"Margarita garnish", LAMP:"Genie's home", DIETS:"Cuts carbs, say",
+GUILDER:"Country across the sea, sworn enemy of {FLORIN}", AMEN:"\"You said it!\"", AMISS:"Not quite right", MEA:"___ culpa",
+CLIFFSOFINSANITY:"Sheer obstacle that Fezzik climbs with three passengers",
+OAR:"Rowboat need", RILES:"Irritates", ANTS:"Picnic crashers",
+PREPARE:"\"___ to die\" (end of Inigo Montoya's famous greeting)", SPICE:"Cumin or cardamom",
+AMSO:"\"I ___ hungry I could eat a horse\" (2 wds.)", AMAT:"Latin for \"she loves\"", FAR:"A long way off",
+PRINCESSBRIDE:"With \"The,\" 1987 fairy-tale film celebrated in this puzzle",
+STOLENON:"Crept up to unnoticed, old-style (2 wds.)", SALINAS:"Steinbeck's California hometown",
+PINAFORE:"Gilbert and Sullivan's \"H.M.S. ___\"", AGESAGO:"Way back when (2 wds.)",
+FLORIN:"Buttercup's homeland, ruled by Prince Humperdinck", TOWELED:"Dried (off) after a shower",
+ANTIC:"Zany stunt", DIANE:"Actress Keaton", DANCE:"Waltz or tango", EGGO:"Waffle brand you might \"leggo\"", DARN:"\"Shoot!\"",
+ORACLE:"Delphi fortune-teller", NAMEIT:"\"Anything you want!\" (2 wds.)", TRIB:"Chicago paper, familiarly", OVAL:"Racetrack shape",
+RETELL:"Narrate again", TRI:"Prefix with cycle or pod", ESO:"That, in Spanish", SEN:"Capitol Hill fig.",
+PAVE:"Cover with asphalt", EVA:"Actress Longoria", IMSAFE:"Reassuring text after a storm (2 wds.)", ADMIT:"Fess up to",
+MEETS:"Track competitions", PRAY:"Say grace, say", DEF:"Excellent, in old hip-hop slang", INFRA:"Prefix with red or structure",
+GIN:"Martini base", USS:"Letters before Enterprise", ISAAC:"Newton or Asimov", ALARM:"Morning rouser", MIRES:"Bogs down",
+MISSME:"Question from someone back from a long trip (2 wds.)", COPA:"Manilow hot spot, with \"the\"", SIR:"Knight's title",
+OLE:"Bullring cheer", NNE:"Opposite of SSW", POPLAR:"Tall, fast-growing tree", PASSAT:"Volkswagen sedan",
+ITSAGO:"\"We're all set!\" (3 wds.)", ACNE:"Teen's skin woe", FINAL:"End-of-semester exam", ADAGE:"Old saying",
+RESOD:"Add grass to again", REFI:"New home loan, for short", INON:"Privy to (2 wds.)", NOR:"Neither's partner",
+BLEW:"Squandered, as a lead", RISE:"Get out of bed", SPF:"Sunscreen letters", TIL:"Up to, briefly", ONO:"Yoko of music"
+};
+const ROWS = ORIG;
+const H = ROWS.length, W = ROWS[0].length, KEY = "tinybao-puzzle-asyouwish-v3", FLIPKEY = "tinybao-puzzle-asyouwish-v2", OLDKEY = "tinybao-puzzle-asyouwish-v1";
+const sol = (r, c) => (r < 0 || c < 0 || r >= H || c >= W) ? "#" : ROWS[r][c];
+const cells = [], words = [];           // words: {dir, num, cells:[[r,c]], ans, clue, li}
+const at = {};                          // "r,c" -> {a: wordIndex, d: wordIndex}
+let num = 0;
+for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+  if (sol(r, c) === "#") continue;
+  const sa = sol(r, c - 1) === "#" && sol(r, c + 1) !== "#", sd = sol(r - 1, c) === "#" && sol(r + 1, c) !== "#";
+  if (sa || sd) num++;
+  at[r + "," + c] = at[r + "," + c] || {};
+  if (sa) { const cs = []; for (let x = c; sol(r, x) !== "#"; x++) cs.push([r, x]); words.push({ dir: "a", num, cells: cs }); }
+  if (sd) { const cs = []; for (let y = r; sol(y, c) !== "#"; y++) cs.push([y, c]); words.push({ dir: "d", num, cells: cs }); }
+  if (sa || sd) at[r + "," + c].num = num;
+}
+words.sort((x, y) => (x.dir === y.dir ? x.num - y.num : x.dir === "a" ? -1 : 1));
+words.forEach((w, i) => {
+  w.ans = w.cells.map(([r, c]) => sol(r, c)).join(""); w.clue = CLUES[w.ans] || w.ans;
+  w.cells.forEach(([r, c]) => { (at[r + "," + c] = at[r + "," + c] || {})[w.dir] = i; });
+});
+
+words.forEach(w => { w.clue = w.clue.replace(/\{(\w+)\}/, (_, a) => { const t = words.find(x => x.ans === a); return t.num + (t.dir === "a" ? "-Across" : "-Down"); }); });
+let fill = {}, pen = {}, bad = {}, rev = {}, pencil = false, cur = { r: 0, c: 0, dir: "a" };
+try {   // carry progress over from earlier layouts (v2 was flipped along the diagonal)
+  if (!localStorage.getItem(KEY)) {
+    if (localStorage.getItem(FLIPKEY)) {
+      const o = JSON.parse(localStorage.getItem(FLIPKEY)), t = m => Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k.split(",").reverse().join(","), v]));
+      localStorage.setItem(KEY, JSON.stringify({ fill: t(o.fill), pen: t(o.pen), bad: t(o.bad), rev: t(o.rev), pencil: o.pencil, cur: o.cur ? { r: o.cur.c, c: o.cur.r, dir: o.cur.dir === "a" ? "d" : "a" } : null }));
+    } else if (localStorage.getItem(OLDKEY)) localStorage.setItem(KEY, localStorage.getItem(OLDKEY));
+  }
+} catch (e) {}
+try { const s = JSON.parse(localStorage.getItem(KEY) || "{}"); fill = s.fill || {}; pen = s.pen || {}; bad = s.bad || {}; rev = s.rev || {}; pencil = !!s.pencil; if (s.cur) cur = s.cur; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ fill, pen, bad, rev, pencil, cur })); } catch (e) {} };
+const $ = id => document.getElementById(id);
+const get = (r, c) => fill[r + "," + c] || "";
+const wordAt = () => words[at[cur.r + "," + cur.c][cur.dir]];
+const isDone = w => w.cells.every(([r, c]) => get(r, c));
+
+// build grid
+const grid = $("grid");
+for (let r = 0; r < H; r++) { cells.push([]); for (let c = 0; c < W; c++) {
+  const d = document.createElement("div"); d.className = "c" + (sol(r, c) === "#" ? " b" : "");
+  if (sol(r, c) !== "#") {
+    const n = at[r + "," + c].num; d.innerHTML = (n ? `<span class="n">${n}</span>` : "") + `<span class="l"></span>`;
+    d.addEventListener("click", () => { if (cur.r === r && cur.c === c) flip(); else { cur.r = r; cur.c = c; if (at[r + "," + c][cur.dir] === undefined) flip(); } render(); });
+  }
+  grid.appendChild(d); cells[r].push(d);
+} }
+// build clue lists
+words.forEach((w, i) => {
+  const li = document.createElement("li"); li.innerHTML = `<b>${w.num}</b><span></span>`; li.lastChild.textContent = w.clue;
+  li.addEventListener("click", () => { goWord(i); render(); });
+  (w.dir === "a" ? $("la") : $("ld")).appendChild(li); w.li = li;
+});
+
+function flip() { const o = cur.dir === "a" ? "d" : "a"; if (at[cur.r + "," + cur.c][o] !== undefined) cur.dir = o; }
+function goWord(i) { const w = words[i]; cur.dir = w.dir; const e = w.cells.find(([r, c]) => !get(r, c)) || w.cells[0]; cur.r = e[0]; cur.c = e[1]; }
+function step(delta) {   // next/previous unfinished clue; falls back to plain next when all are filled
+  const i = at[cur.r + "," + cur.c][cur.dir], n = words.length;
+  for (let k = 1; k <= n; k++) { const j = (i + delta * k + n * k) % n; if (!isDone(words[j])) return goWord(j); }
+  goWord((i + delta + n) % n);
+}
+function move(dr, dc) {
+  let r = cur.r + dr, c = cur.c + dc;
+  while (r >= 0 && c >= 0 && r < H && c < W && sol(r, c) === "#") { r += dr; c += dc; }
+  if (r >= 0 && c >= 0 && r < H && c < W) { cur.r = r; cur.c = c; if (at[r + "," + c][cur.dir] === undefined) flip(); }
+}
+function type(ch) {
+  delete bad[cur.r + "," + cur.c]; delete rev[cur.r + "," + cur.c];
+  fill[cur.r + "," + cur.c] = ch;
+  if (pencil) pen[cur.r + "," + cur.c] = 1; else delete pen[cur.r + "," + cur.c];
+  const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
+  const nxt = w.cells.slice(k + 1).find(([r, c]) => !get(r, c)) || w.cells.find(([r, c]) => !get(r, c));
+  if (nxt) { cur.r = nxt[0]; cur.c = nxt[1]; }
+  else if (k < w.cells.length - 1) { cur.r = w.cells[k + 1][0]; cur.c = w.cells[k + 1][1]; }
+  else step(1);
+}
+function back() {
+
+  const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
+  if (!get(cur.r, cur.c) && k > 0) { cur.r = w.cells[k - 1][0]; cur.c = w.cells[k - 1][1]; }
+  delete fill[cur.r + "," + cur.c]; delete pen[cur.r + "," + cur.c]; delete bad[cur.r + "," + cur.c]; delete rev[cur.r + "," + cur.c];
+}
+
+let wasFull = null, wasSolved = null;
+function popup(emo, title, text, btn) { $("memo").textContent = emo; $("mtitle").textContent = title; $("mtext").textContent = text; $("mok").textContent = btn; $("modal").classList.add("open"); $("mok").focus(); }
+function closePopup() { $("modal").classList.remove("open"); $("mok").blur(); }
+
+function render() {
+  const w = wordAt(), inw = new Set(w.cells.map(x => x.join(",")));
+  let filled = 0, total = 0, right = 0;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    if (sol(r, c) === "#") continue;
+    const d = cells[r][c], v = get(r, c), k = r + "," + c, good = v === sol(r, c);
+    total++; if (v) filled++; if (good) right++;
+    d.className = "c" + (inw.has(k) ? " w" : "") + (pen[k] ? " p" : "") + (bad[k] ? " bad" : "") + (rev[k] ? " rev" : "") + (r === cur.r && c === cur.c ? " cur" : "");
+    d.querySelector(".l").textContent = v;
+
+  }
+
+  words.forEach(x => {
+
+    x.li.className = (x === w ? "on " : "") + (isDone(x) ? "done" : "");
+
+  });
+  $("cluetxt").innerHTML = `<b>${w.num}${w.dir === "a" ? "A" : "D"}</b><span></span>`; $("cluetxt").lastChild.textContent = w.clue;
+
+  document.querySelectorAll("#pencil, .kr .pk").forEach(b => { b.classList.toggle("on", pencil); b.setAttribute("aria-pressed", pencil); });
+  $("status").textContent = right === total ? "Solved! Have fun storming the castle!" : `${filled} of ${total} squares filled`;
+
+  const full = filled === total, solved = right === total;
+  if (wasFull !== null) {
+    if (solved && !wasSolved) popup("\u{1F478}", "You found the princess!", "Every square is correct. That was true love, or at least true spelling. Have fun storming the castle!", "See the finished puzzle");
+    else if (full && !solved && !wasFull) popup("\u{1F573}\uFE0F", "Not quite\u2026", "At least one letter is incorrect, but don't fall into the Pit of Despair. Keep going until you see the princess.", "Okay");
+  }
+  wasFull = full; wasSolved = solved;
+  $("gridwrap").classList.toggle("solved", solved);
+  if (!document.body.classList.contains("touch")) w.li.scrollIntoView({ block: "nearest" });
+  save();
+}
+
+$("prev").onclick = () => { step(-1); render(); };
+$("next").onclick = () => { step(1); render(); };
+const closeMenu = () => $("menu").classList.remove("open");
+$("menubtn").onclick = e => { e.stopPropagation(); $("menu").classList.toggle("open"); e.currentTarget.blur(); };
+document.addEventListener("click", closeMenu);
+$("pencil").onclick = e => { pencil = !pencil; e.currentTarget.blur(); render(); };
+$("mistakes").onclick = () => {
+  if (!confirm("Reveal mistakes?\n\nEvery square holding a wrong letter will turn pink. The correct letters stay hidden, and empty squares are not marked.")) return;
+  let n = 0;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const k = r + "," + c, v = get(r, c); if (v && v !== sol(r, c)) { bad[k] = 1; n++; } }
+  render();
+  if (!n) popup("\u2728", "No mistakes so far", "Every letter you have entered is correct. Keep going!", "Okay");
+};
+
+$("reveal").onclick = () => { const k = cur.r + "," + cur.c; fill[k] = sol(cur.r, cur.c); delete pen[k]; delete bad[k]; rev[k] = 1; render(); };
+$("clear").onclick = () => { if (confirm("Start over?\n\nThis erases every letter you have entered, including pencil marks. It cannot be undone.")) { fill = {}; pen = {}; bad = {}; rev = {}; cur = { r: 0, c: 0, dir: "a" }; render(); } };
+$("cluetxt").onclick = () => { flip(); render(); };
+
+$("mok").onclick = e => { e.stopPropagation(); closePopup(); };
+$("modal").onclick = e => { if (e.target === $("modal")) closePopup(); };
+document.addEventListener("keydown", e => {
+  if ($("modal").classList.contains("open")) { if (e.key === "Enter" || e.key === "Escape" || e.key === " ") closePopup(); e.preventDefault(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  if (k === "Escape") { closeMenu(); return; }
+  if (/^[a-zA-Z]$/.test(k)) type(k.toUpperCase());
+  else if (k === "Backspace" || k === "Delete") back();
+  else if (k === "ArrowRight") { if (cur.dir !== "a") cur.dir = at[cur.r + "," + cur.c].a !== undefined ? "a" : cur.dir; move(0, 1); }
+  else if (k === "ArrowLeft") move(0, -1);
+  else if (k === "ArrowDown") move(1, 0);
+  else if (k === "ArrowUp") move(-1, 0);
+  else if (k === " ") flip();
+  else if (k === "Tab" || k === "Enter" || k === ">" || k === ".") step(e.shiftKey && k === "Tab" ? -1 : 1);
+  else if (k === "<" || k === ",") step(-1);
+  else return;
+  e.preventDefault(); render();
+});
+
+// on-screen keyboard for touch devices
+if (window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) {
+  document.body.classList.add("touch");
+  ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"].forEach((row, i) => {
+    const d = document.createElement("div"); d.className = "kr";
+    const add = (label, fn, wide) => { const b = document.createElement("button"); b.textContent = label; if (wide) b.className = "wide"; b.addEventListener("click", () => { fn(); render(); }); d.appendChild(b); };
+    if (i === 2) { add("✎", () => { pencil = !pencil; }, true); d.lastChild.classList.add("pk"); }
+    [...row].forEach(ch => add(ch, () => type(ch)));
+    if (i === 2) add("⌫", back, true);
+    $("kb").appendChild(d);
+  });
+}
+if (sol(cur.r, cur.c) === "#" || !at[cur.r + "," + cur.c]) cur = { r: 0, c: 0, dir: "a" };
+render();
+</script>
+</body>
+</html>
