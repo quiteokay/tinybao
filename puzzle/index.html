@@ -11,13 +11,21 @@
   :root {
     --bg: #f4f1ea; --ink: #1c1b19; --muted: #6d685f; --line: #2a2926;
     --cell: #ffffff; --block: #1c1b19; --word: #cfe6f7; --cursor: #ffd84d;
-    --good: #1d7a46; --bad: #c0392b; --badbg: #fde4e0; --panel: #ffffff; --key: #e3dfd6;
+    --good: #1d7a46; --bad: #c0392b; --badbg: #fde4e0; --panel: #ffffff; --key: #e3dfd6; --pencil: #8a8a8a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: var(--bg); color: var(--ink); }
   body { font-family: Georgia, "Times New Roman", serif; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   button { font: inherit; color: inherit; cursor: pointer; }
-  header { text-align: center; padding: 18px 16px 8px; }
+  header { text-align: center; padding: 18px 110px 8px; position: relative; }
+  .tools { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
+  .tools > button { width: 42px; height: 42px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); font: 20px/1 system-ui, sans-serif; }
+  .tools > button.on { background: var(--pencil); color: #fff; }
+  #menu { display: none; position: absolute; top: 48px; right: 0; z-index: 20; background: var(--panel); border: 2px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 170px; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+  #menu.open { display: block; }
+  #menu button { display: block; width: 100%; text-align: left; padding: 13px 16px; border: 0; background: transparent; font: 600 15px system-ui, sans-serif; }
+  #menu button + button { border-top: 1px solid #ddd; }
+  #menu button:hover { background: var(--word); }
   header h1 { font-size: 28px; letter-spacing: .5px; }
   header p { color: var(--muted); font-size: 14px; margin-top: 4px; font-style: italic; }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 0 12px 24px; display: grid; gap: 18px; grid-template-columns: 1fr; }
@@ -34,6 +42,7 @@
   .c.cur { background: var(--cursor); }
   .c .n { position: absolute; top: 2cqw; left: 5cqw; font: 26cqw/1 system-ui, sans-serif; color: #444; }
   .c .l { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6cqw; font: 600 62cqw/1 system-ui, sans-serif; text-transform: uppercase; }
+  .c.p .l { color: var(--pencil); }
   .c.ok .l { color: var(--good); }
   .c.bad { background: var(--badbg); }
   .c.bad.cur { background: var(--cursor); }
@@ -59,7 +68,7 @@
     .board { position: sticky; top: 10px; }
   }
   @media (max-width: 899px) {
-    header { padding: 10px 12px 4px; } header h1 { font-size: 22px; } header p { font-size: 13px; }
+    header { padding: 10px 104px 4px 12px; text-align: left; } .tools { top: 8px; right: 8px; } header h1 { font-size: 22px; } header p { font-size: 13px; }
     .wrap { padding: 0 6px 24px; }
     .lists li { font-size: 14px; }
   }
@@ -73,12 +82,23 @@
   .kr button { flex: 1 1 0; max-width: 44px; height: 44px; border: 0; border-radius: 5px; background: var(--key); font: 600 17px system-ui, sans-serif; }
   .kr button.wide { flex: 1.6 1 0; max-width: 70px; font-size: 14px; }
   .kr button:active { background: #b9b4a8; }
+  .kr button.on { background: var(--pencil); color: #fff; }
+  #keep { display: none; }
 </style>
 </head>
 <body>
 <header>
   <h1>As You Wish</h1>
   <p>A crossword for anyone who has ever stormed a castle</p>
+  <div class="tools">
+    <button id="pencil" aria-label="Pencil mode" aria-pressed="false" title="Pencil">&#9998;</button>
+    <button id="menubtn" aria-label="Menu" aria-haspopup="true" title="Menu">&#9776;</button>
+    <div id="menu">
+      <button id="check">Check it</button>
+      <button id="reveal">Reveal letter</button>
+      <button id="clear">Start over</button>
+    </div>
+  </div>
 </header>
 <div class="wrap">
   <div class="board">
@@ -92,8 +112,7 @@
     </div>
     <div id="grid"></div>
     <div class="actions">
-      <button id="check" class="primary">Check it</button>
-      <button id="clear">Start over</button>
+      <button id="keep" class="primary">Keep solving</button>
       <div id="status"></div>
     </div>
   </div>
@@ -154,9 +173,9 @@ words.forEach((w, i) => {
   w.cells.forEach(([r, c]) => { (at[r + "," + c] = at[r + "," + c] || {})[w.dir] = i; });
 });
 
-let fill = {}, cur = { r: 0, c: 0, dir: "a" }, checked = false;
-try { const s = JSON.parse(localStorage.getItem(KEY) || "{}"); fill = s.fill || {}; if (s.cur) cur = s.cur; } catch (e) {}
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ fill, cur })); } catch (e) {} };
+let fill = {}, pen = {}, pencil = false, cur = { r: 0, c: 0, dir: "a" }, checked = false;
+try { const s = JSON.parse(localStorage.getItem(KEY) || "{}"); fill = s.fill || {}; pen = s.pen || {}; pencil = !!s.pencil; if (s.cur) cur = s.cur; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ fill, pen, pencil, cur })); } catch (e) {} };
 const $ = id => document.getElementById(id);
 const get = (r, c) => fill[r + "," + c] || "";
 const wordAt = () => words[at[cur.r + "," + cur.c][cur.dir]];
@@ -194,6 +213,7 @@ function move(dr, dc) {
 function type(ch) {
   if (checked) uncheck();
   fill[cur.r + "," + cur.c] = ch;
+  if (pencil) pen[cur.r + "," + cur.c] = 1; else delete pen[cur.r + "," + cur.c];
   const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
   const nxt = w.cells.slice(k + 1).find(([r, c]) => !get(r, c)) || w.cells.find(([r, c]) => !get(r, c));
   if (nxt) { cur.r = nxt[0]; cur.c = nxt[1]; }
@@ -203,8 +223,8 @@ function type(ch) {
 function back() {
   if (checked) uncheck();
   const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
-  if (get(cur.r, cur.c)) delete fill[cur.r + "," + cur.c];
-  else if (k > 0) { cur.r = w.cells[k - 1][0]; cur.c = w.cells[k - 1][1]; delete fill[cur.r + "," + cur.c]; }
+  if (!get(cur.r, cur.c) && k > 0) { cur.r = w.cells[k - 1][0]; cur.c = w.cells[k - 1][1]; }
+  delete fill[cur.r + "," + cur.c]; delete pen[cur.r + "," + cur.c];
 }
 function uncheck() { checked = false; }
 
@@ -215,7 +235,7 @@ function render() {
     if (sol(r, c) === "#") continue;
     const d = cells[r][c], v = get(r, c), k = r + "," + c, good = v === sol(r, c);
     total++; if (v) filled++; if (good) right++;
-    d.className = "c" + (inw.has(k) ? " w" : "") + (r === cur.r && c === cur.c ? " cur" : "") + (checked ? (good ? " ok" : " bad") : "");
+    d.className = "c" + (inw.has(k) ? " w" : "") + (r === cur.r && c === cur.c ? " cur" : "") + (checked ? (good ? " ok" : " bad") : (pen[k] ? " p" : ""));
     d.querySelector(".l").textContent = checked ? sol(r, c) : v;
     let was = d.querySelector(".was");
     if (checked && v && !good) { if (!was) { was = document.createElement("span"); was.className = "was"; d.appendChild(was); } was.textContent = v; }
@@ -231,6 +251,8 @@ function render() {
   });
   $("cluetxt").innerHTML = `<b>${w.num}${w.dir === "a" ? "A" : "D"}</b><span></span>`; $("cluetxt").lastChild.textContent = w.clue;
   $("check").textContent = checked ? "Keep solving" : "Check it";
+  $("keep").style.display = checked ? "block" : "none";
+  document.querySelectorAll("#pencil, .kr .pk").forEach(b => { b.classList.toggle("on", pencil); b.setAttribute("aria-pressed", pencil); });
   $("status").textContent = checked
     ? (right === total ? "Perfect. Have fun storming the castle!" : `${wr} of ${words.length} answers right · ${total - right} squares to fix (correct letters shown in red)`)
     : (right === total ? "Solved! Have fun storming the castle!" : `${filled} of ${total} squares filled`);
@@ -240,13 +262,20 @@ function render() {
 
 $("prev").onclick = () => { step(-1); render(); };
 $("next").onclick = () => { step(1); render(); };
+const closeMenu = () => $("menu").classList.remove("open");
+$("menubtn").onclick = e => { e.stopPropagation(); $("menu").classList.toggle("open"); e.currentTarget.blur(); };
+document.addEventListener("click", closeMenu);
+$("pencil").onclick = e => { pencil = !pencil; e.currentTarget.blur(); render(); };
 $("check").onclick = () => { checked = !checked; render(); };
-$("clear").onclick = () => { if (confirm("Erase everything and start over?")) { fill = {}; checked = false; cur = { r: 0, c: 0, dir: "a" }; render(); } };
+$("keep").onclick = () => { checked = false; render(); };
+$("reveal").onclick = () => { checked = false; const k = cur.r + "," + cur.c; fill[k] = sol(cur.r, cur.c); delete pen[k]; render(); };
+$("clear").onclick = () => { if (confirm("Erase everything and start over?")) { fill = {}; pen = {}; checked = false; cur = { r: 0, c: 0, dir: "a" }; render(); } };
 $("cluetxt").onclick = () => { flip(); render(); };
 
 document.addEventListener("keydown", e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
+  if (k === "Escape") { closeMenu(); return; }
   if (/^[a-zA-Z]$/.test(k)) type(k.toUpperCase());
   else if (k === "Backspace" || k === "Delete") back();
   else if (k === "ArrowRight") { if (cur.dir !== "a") cur.dir = at[cur.r + "," + cur.c].a !== undefined ? "a" : cur.dir; move(0, 1); }
@@ -266,7 +295,7 @@ if (window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) 
   ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"].forEach((row, i) => {
     const d = document.createElement("div"); d.className = "kr";
     const add = (label, fn, wide) => { const b = document.createElement("button"); b.textContent = label; if (wide) b.className = "wide"; b.addEventListener("click", () => { fn(); render(); }); d.appendChild(b); };
-    if (i === 2) add("A↔D", flip, true);
+    if (i === 2) { add("A↔D", flip, true); add("✎", () => { pencil = !pencil; }, true); d.lastChild.classList.add("pk"); }
     [...row].forEach(ch => add(ch, () => type(ch)));
     if (i === 2) add("⌫", back, true);
     $("kb").appendChild(d);
