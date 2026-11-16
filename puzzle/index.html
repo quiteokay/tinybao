@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-title" content="tiny bao puzzle">
+<link rel="apple-touch-icon" href="/lilbao_351.png">
+<link rel="icon" type="image/png" href="/lilbao_351.png">
+<title>As You Wish · tiny bao crossword</title>
+<style>
+  :root {
+    --bg: #f4f1ea; --ink: #1c1b19; --muted: #6d685f; --line: #2a2926;
+    --cell: #ffffff; --block: #1c1b19; --word: #cfe6f7; --cursor: #ffd84d;
+    --good: #1d7a46; --bad: #c0392b; --badbg: #fde4e0; --panel: #ffffff; --key: #e3dfd6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: Georgia, "Times New Roman", serif; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  header { text-align: center; padding: 18px 16px 8px; }
+  header h1 { font-size: 28px; letter-spacing: .5px; }
+  header p { color: var(--muted); font-size: 14px; margin-top: 4px; font-style: italic; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 12px 24px; display: grid; gap: 18px; grid-template-columns: 1fr; }
+  .board { min-width: 0; }
+  .cluebar { display: flex; align-items: stretch; background: var(--word); border: 2px solid var(--line); border-radius: 8px; overflow: hidden; min-height: 56px; }
+  .cluebar button { flex: 0 0 48px; background: transparent; border: 0; font-size: 26px; font-family: system-ui, sans-serif; }
+  .cluebar button:active { background: rgba(0,0,0,.12); }
+  .cluebar .txt { flex: 1; display: flex; align-items: center; padding: 6px 4px; font-size: 16px; line-height: 1.25; }
+  .cluebar .txt b { margin-right: 8px; white-space: nowrap; font-family: system-ui, sans-serif; font-size: 14px; }
+  #grid { display: grid; grid-template-columns: repeat(16, 1fr); border: 2px solid var(--line); background: var(--line); gap: 1px; margin-top: 10px; user-select: none; -webkit-user-select: none; }
+  .c { position: relative; background: var(--cell); aspect-ratio: 1; container-type: inline-size; cursor: pointer; }
+  .c.b { background: var(--block); cursor: default; }
+  .c.w { background: var(--word); }
+  .c.cur { background: var(--cursor); }
+  .c .n { position: absolute; top: 2cqw; left: 5cqw; font: 26cqw/1 system-ui, sans-serif; color: #444; }
+  .c .l { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6cqw; font: 600 62cqw/1 system-ui, sans-serif; text-transform: uppercase; }
+  .c.ok .l { color: var(--good); }
+  .c.bad { background: var(--badbg); }
+  .c.bad.cur { background: var(--cursor); }
+  .c.bad .l { color: var(--bad); }
+  .c .was { position: absolute; top: 2cqw; right: 6cqw; font: 26cqw/1 system-ui, sans-serif; color: var(--bad); text-decoration: line-through; }
+  .actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .actions button { padding: 10px 16px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); font-family: system-ui, sans-serif; font-size: 15px; font-weight: 600; }
+  .actions button.primary { background: var(--ink); color: #fff; }
+  #status { font-family: system-ui, sans-serif; font-size: 15px; flex: 1 1 200px; }
+  .lists { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-width: 0; }
+  .lists h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 2px solid var(--line); padding-bottom: 4px; margin-bottom: 4px; font-family: system-ui, sans-serif; }
+  .lists ol { list-style: none; }
+  .lists li { display: flex; gap: 6px; padding: 5px 6px; font-size: 15px; line-height: 1.3; border-radius: 4px; cursor: pointer; }
+  .lists li b { flex: 0 0 24px; text-align: right; font-family: system-ui, sans-serif; font-size: 13px; padding-top: 1px; }
+  .lists li.on { background: var(--word); }
+  .lists li.done span { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
+  .lists li .ans { display: inline-block; width: 100%; font-family: system-ui, sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-decoration: none; }
+  .lists li .ans.g { color: var(--good); } .lists li .ans.r { color: var(--bad); }
+  #kb { display: none; }
+  @media (min-width: 900px) {
+    .wrap { grid-template-columns: minmax(0, 620px) minmax(0, 1fr); align-items: start; }
+    .lists { max-height: calc(100vh - 110px); overflow: auto; padding-right: 6px; }
+    .board { position: sticky; top: 10px; }
+  }
+  @media (max-width: 899px) {
+    header { padding: 10px 12px 4px; } header h1 { font-size: 22px; } header p { font-size: 13px; }
+    .wrap { padding: 0 6px 24px; }
+    .lists li { font-size: 14px; }
+  }
+  /* touch layout: clue bar and keyboard pinned to the bottom */
+  body.touch .wrap { padding-bottom: 250px; }
+  body.touch .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--bg); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -2px 10px rgba(0,0,0,.15); }
+  body.touch .cluebar { border-radius: 6px; min-height: 52px; }
+  body.touch #kb { display: block; margin-top: 6px; }
+  body.touch #grid { margin-top: 4px; }
+  .kr { display: flex; justify-content: center; gap: 4px; margin-top: 5px; }
+  .kr button { flex: 1 1 0; max-width: 44px; height: 44px; border: 0; border-radius: 5px; background: var(--key); font: 600 17px system-ui, sans-serif; }
+  .kr button.wide { flex: 1.6 1 0; max-width: 70px; font-size: 14px; }
+  .kr button:active { background: #b9b4a8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>As You Wish</h1>
+  <p>A crossword for anyone who has ever stormed a castle</p>
+</header>
+<div class="wrap">
+  <div class="board">
+    <div class="dock">
+      <div class="cluebar">
+        <button id="prev" aria-label="Previous unfinished clue">&lsaquo;</button>
+        <div class="txt" id="cluetxt"></div>
+        <button id="next" aria-label="Next unfinished clue">&rsaquo;</button>
+      </div>
+      <div id="kb"></div>
+    </div>
+    <div id="grid"></div>
+    <div class="actions">
+      <button id="check" class="primary">Check it</button>
+      <button id="clear">Start over</button>
+      <div id="status"></div>
+    </div>
+  </div>
+  <div class="lists">
+    <div><h2>Across</h2><ol id="la"></ol></div>
+    <div><h2>Down</h2><ol id="ld"></ol></div>
+  </div>
+</div>
+<script>
+const ROWS = [
+"ADDEDON###TORTES","NIAGARA#PERVERSE","TANGRAM#AVIATION","INCONCEIVABLE###",
+"CEE##LIME###LAMP","###DIETS#GUILDER","#AMEN##AMISS#MEA","CLIFFSOFINSANITY",
+"OAR#RILES##ANTS#","PREPARE#SPICE###","AMSO###AMAT##FAR","###PRINCESSBRIDE",
+"STOLENON#SALINAS","PINAFORE#AGESAGO","FLORIN###TOWELED"];
+const CLUES = {
+ADDEDON:"Tacked at the end", TORTES:"Rich layered cakes", NIAGARA:"Falls for honeymooners?", PERVERSE:"Stubbornly contrary",
+TANGRAM:"Seven-piece puzzle from China", AVIATION:"Flying field?",
+INCONCEIVABLE:"Vizzini's favorite word, which may not mean what he thinks it means",
+CEE:"Middling grade", LIME:"Margarita garnish", LAMP:"Genie's home", DIETS:"Cuts carbs, say",
+GUILDER:"Country across the sea, sworn enemy of 66-Across", AMEN:"\"You said it!\"", AMISS:"Not quite right", MEA:"___ culpa",
+CLIFFSOFINSANITY:"Sheer obstacle that Fezzik climbs with three passengers",
+OAR:"Rowboat need", RILES:"Irritates", ANTS:"Picnic crashers",
+PREPARE:"\"___ to die\" (end of Inigo Montoya's famous greeting)", SPICE:"Cumin or cardamom",
+AMSO:"Playground comeback", AMAT:"Third of a Latin 101 trio", FAR:"A long way off",
+PRINCESSBRIDE:"With \"The,\" 1987 fairy-tale film celebrated in this puzzle",
+STOLENON:"Crept up to unnoticed, old-style (2 wds.)", SALINAS:"Steinbeck's California hometown",
+PINAFORE:"Gilbert and Sullivan's \"H.M.S. ___\"", AGESAGO:"Way back when (2 wds.)",
+FLORIN:"Buttercup's homeland, ruled by Prince Humperdinck", TOWELED:"Dried (off) after a shower",
+ANTIC:"Zany stunt", DIANE:"Actress Keaton", DANCE:"Waltz or tango", EGGO:"Waffle brand you might \"leggo\"", DARN:"\"Shoot!\"",
+ORACLE:"Delphi fortune-teller", NAMEIT:"\"Anything you want!\" (2 wds.)", TRIB:"Chicago paper, familiarly", OVAL:"Racetrack shape",
+RETELL:"Narrate again", TRI:"Prefix with cycle or pod", ESO:"That, in Spanish", SEN:"Capitol Hill fig.",
+PAVE:"Cover with asphalt", EVA:"Actress Longoria", IMSAFE:"Reassuring text after a storm (2 wds.)", ADMIT:"Fess up to",
+MEETS:"Track competitions", PRAY:"Say grace, say", DEF:"Excellent, in old hip-hop slang", INFRA:"Prefix with red or structure",
+GIN:"Martini base", USS:"Letters before Enterprise", ISAAC:"Newton or Asimov", ALARM:"Morning rouser", MIRES:"Bogs down",
+MISSME:"Question from someone back from a long trip (2 wds.)", COPA:"Manilow hot spot, with \"the\"", SIR:"Knight's title",
+OLE:"Bullring cheer", NNE:"Opposite of SSW", POPLAR:"Tall, fast-growing tree", PASSAT:"Volkswagen sedan",
+ITSAGO:"\"We're all set!\" (3 wds.)", ACNE:"Teen's skin woe", FINAL:"End-of-semester exam", ADAGE:"Old saying",
+RESOD:"Patch, as a lawn", REFI:"New home loan, for short", INON:"Privy to (2 wds.)", NOR:"Neither's partner",
+BLEW:"Squandered, as a lead", RISE:"Get out of bed", SPF:"Sunscreen letters", TIL:"Up to, briefly", ONO:"Yoko of music"
+};
+const H = ROWS.length, W = ROWS[0].length, KEY = "tinybao-puzzle-asyouwish-v1";
+const sol = (r, c) => (r < 0 || c < 0 || r >= H || c >= W) ? "#" : ROWS[r][c];
+const cells = [], words = [];           // words: {dir, num, cells:[[r,c]], ans, clue, li}
+const at = {};                          // "r,c" -> {a: wordIndex, d: wordIndex}
+let num = 0;
+for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+  if (sol(r, c) === "#") continue;
+  const sa = sol(r, c - 1) === "#" && sol(r, c + 1) !== "#", sd = sol(r - 1, c) === "#" && sol(r + 1, c) !== "#";
+  if (sa || sd) num++;
+  at[r + "," + c] = at[r + "," + c] || {};
+  if (sa) { const cs = []; for (let x = c; sol(r, x) !== "#"; x++) cs.push([r, x]); words.push({ dir: "a", num, cells: cs }); }
+  if (sd) { const cs = []; for (let y = r; sol(y, c) !== "#"; y++) cs.push([y, c]); words.push({ dir: "d", num, cells: cs }); }
+  if (sa || sd) at[r + "," + c].num = num;
+}
+words.sort((x, y) => (x.dir === y.dir ? x.num - y.num : x.dir === "a" ? -1 : 1));
+words.forEach((w, i) => {
+  w.ans = w.cells.map(([r, c]) => sol(r, c)).join(""); w.clue = CLUES[w.ans] || w.ans;
+  w.cells.forEach(([r, c]) => { (at[r + "," + c] = at[r + "," + c] || {})[w.dir] = i; });
+});
+
+let fill = {}, cur = { r: 0, c: 0, dir: "a" }, checked = false;
+try { const s = JSON.parse(localStorage.getItem(KEY) || "{}"); fill = s.fill || {}; if (s.cur) cur = s.cur; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ fill, cur })); } catch (e) {} };
+const $ = id => document.getElementById(id);
+const get = (r, c) => fill[r + "," + c] || "";
+const wordAt = () => words[at[cur.r + "," + cur.c][cur.dir]];
+const isDone = w => w.cells.every(([r, c]) => get(r, c));
+
+// build grid
+const grid = $("grid");
+for (let r = 0; r < H; r++) { cells.push([]); for (let c = 0; c < W; c++) {
+  const d = document.createElement("div"); d.className = "c" + (sol(r, c) === "#" ? " b" : "");
+  if (sol(r, c) !== "#") {
+    const n = at[r + "," + c].num; d.innerHTML = (n ? `<span class="n">${n}</span>` : "") + `<span class="l"></span>`;
+    d.addEventListener("click", () => { if (cur.r === r && cur.c === c) flip(); else { cur.r = r; cur.c = c; if (at[r + "," + c][cur.dir] === undefined) flip(); } render(); });
+  }
+  grid.appendChild(d); cells[r].push(d);
+} }
+// build clue lists
+words.forEach((w, i) => {
+  const li = document.createElement("li"); li.innerHTML = `<b>${w.num}</b><span></span>`; li.lastChild.textContent = w.clue;
+  li.addEventListener("click", () => { goWord(i); render(); });
+  (w.dir === "a" ? $("la") : $("ld")).appendChild(li); w.li = li;
+});
+
+function flip() { const o = cur.dir === "a" ? "d" : "a"; if (at[cur.r + "," + cur.c][o] !== undefined) cur.dir = o; }
+function goWord(i) { const w = words[i]; cur.dir = w.dir; const e = w.cells.find(([r, c]) => !get(r, c)) || w.cells[0]; cur.r = e[0]; cur.c = e[1]; }
+function step(delta) {   // next/previous unfinished clue; falls back to plain next when all are filled
+  const i = at[cur.r + "," + cur.c][cur.dir], n = words.length;
+  for (let k = 1; k <= n; k++) { const j = (i + delta * k + n * k) % n; if (!isDone(words[j])) return goWord(j); }
+  goWord((i + delta + n) % n);
+}
+function move(dr, dc) {
+  let r = cur.r + dr, c = cur.c + dc;
+  while (r >= 0 && c >= 0 && r < H && c < W && sol(r, c) === "#") { r += dr; c += dc; }
+  if (r >= 0 && c >= 0 && r < H && c < W) { cur.r = r; cur.c = c; if (at[r + "," + c][cur.dir] === undefined) flip(); }
+}
+function type(ch) {
+  if (checked) uncheck();
+  fill[cur.r + "," + cur.c] = ch;
+  const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
+  const nxt = w.cells.slice(k + 1).find(([r, c]) => !get(r, c)) || w.cells.find(([r, c]) => !get(r, c));
+  if (nxt) { cur.r = nxt[0]; cur.c = nxt[1]; }
+  else if (k < w.cells.length - 1) { cur.r = w.cells[k + 1][0]; cur.c = w.cells[k + 1][1]; }
+  else step(1);
+}
+function back() {
+  if (checked) uncheck();
+  const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
+  if (get(cur.r, cur.c)) delete fill[cur.r + "," + cur.c];
+  else if (k > 0) { cur.r = w.cells[k - 1][0]; cur.c = w.cells[k - 1][1]; delete fill[cur.r + "," + cur.c]; }
+}
+function uncheck() { checked = false; }
+
+function render() {
+  const w = wordAt(), inw = new Set(w.cells.map(x => x.join(",")));
+  let filled = 0, total = 0, right = 0;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    if (sol(r, c) === "#") continue;
+    const d = cells[r][c], v = get(r, c), k = r + "," + c, good = v === sol(r, c);
+    total++; if (v) filled++; if (good) right++;
+    d.className = "c" + (inw.has(k) ? " w" : "") + (r === cur.r && c === cur.c ? " cur" : "") + (checked ? (good ? " ok" : " bad") : "");
+    d.querySelector(".l").textContent = checked ? sol(r, c) : v;
+    let was = d.querySelector(".was");
+    if (checked && v && !good) { if (!was) { was = document.createElement("span"); was.className = "was"; d.appendChild(was); } was.textContent = v; }
+    else if (was) was.remove();
+  }
+  let wr = 0;
+  words.forEach(x => {
+    const mine = x.cells.map(([r, c]) => get(r, c)).join(""), ok = mine === x.ans; if (ok) wr++;
+    x.li.className = (x === w ? "on " : "") + (isDone(x) ? "done" : "");
+    let a = x.li.querySelector(".ans");
+    if (checked) { if (!a) { a = document.createElement("span"); a.className = "ans"; x.li.querySelector("span").appendChild(a); } a.className = "ans " + (ok ? "g" : "r"); a.textContent = (ok ? "✓ " : "✗ ") + x.ans; }
+    else if (a) a.remove();
+  });
+  $("cluetxt").innerHTML = `<b>${w.num}${w.dir === "a" ? "A" : "D"}</b><span></span>`; $("cluetxt").lastChild.textContent = w.clue;
+  $("check").textContent = checked ? "Keep solving" : "Check it";
+  $("status").textContent = checked
+    ? (right === total ? "Perfect. Have fun storming the castle!" : `${wr} of ${words.length} answers right · ${total - right} squares to fix (correct letters shown in red)`)
+    : (right === total ? "Solved! Have fun storming the castle!" : `${filled} of ${total} squares filled`);
+  if (!document.body.classList.contains("touch")) w.li.scrollIntoView({ block: "nearest" });
+  save();
+}
+
+$("prev").onclick = () => { step(-1); render(); };
+$("next").onclick = () => { step(1); render(); };
+$("check").onclick = () => { checked = !checked; render(); };
+$("clear").onclick = () => { if (confirm("Erase everything and start over?")) { fill = {}; checked = false; cur = { r: 0, c: 0, dir: "a" }; render(); } };
+$("cluetxt").onclick = () => { flip(); render(); };
+
+document.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  if (/^[a-zA-Z]$/.test(k)) type(k.toUpperCase());
+  else if (k === "Backspace" || k === "Delete") back();
+  else if (k === "ArrowRight") { if (cur.dir !== "a") cur.dir = at[cur.r + "," + cur.c].a !== undefined ? "a" : cur.dir; move(0, 1); }
+  else if (k === "ArrowLeft") move(0, -1);
+  else if (k === "ArrowDown") move(1, 0);
+  else if (k === "ArrowUp") move(-1, 0);
+  else if (k === " ") flip();
+  else if (k === "Tab" || k === "Enter" || k === ">" || k === ".") step(e.shiftKey && k === "Tab" ? -1 : 1);
+  else if (k === "<" || k === ",") step(-1);
+  else return;
+  e.preventDefault(); render();
+});
+
+// on-screen keyboard for touch devices
+if (window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) {
+  document.body.classList.add("touch");
+  ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"].forEach((row, i) => {
+    const d = document.createElement("div"); d.className = "kr";
+    const add = (label, fn, wide) => { const b = document.createElement("button"); b.textContent = label; if (wide) b.className = "wide"; b.addEventListener("click", () => { fn(); render(); }); d.appendChild(b); };
+    if (i === 2) add("A↔D", flip, true);
+    [...row].forEach(ch => add(ch, () => type(ch)));
+    if (i === 2) add("⌫", back, true);
+    $("kb").appendChild(d);
+  });
+}
+if (sol(cur.r, cur.c) === "#" || !at[cur.r + "," + cur.c]) cur = { r: 0, c: 0, dir: "a" };
+render();
+</script>
+</body>
+</html>
