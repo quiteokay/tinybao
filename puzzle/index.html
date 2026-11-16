@@ -86,6 +86,13 @@
   .kr button:active { background: #b9b4a8; }
   .kr button.on { background: var(--pencil); color: #fff; }
   #keep { display: none; }
+  #modal { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(20,18,15,.6); align-items: center; justify-content: center; padding: 20px; }
+  #modal.open { display: flex; }
+  #modal .card { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 26px 22px 22px; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  #modal .emo { font-size: 64px; line-height: 1; }
+  #modal h2 { font-size: 24px; margin: 12px 0 8px; }
+  #modal p { font-size: 17px; line-height: 1.4; color: #3a3833; }
+  #modal button { margin-top: 18px; padding: 12px 26px; border: 2px solid var(--line); border-radius: 8px; background: var(--ink); color: #fff; font: 600 16px system-ui, sans-serif; }
 </style>
 </head>
 <body>
@@ -120,6 +127,14 @@
   <div class="lists">
     <div><h2>Across</h2><ol id="la"></ol></div>
     <div><h2>Down</h2><ol id="ld"></ol></div>
+  </div>
+</div>
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+  <div class="card">
+    <div class="emo" id="memo"></div>
+    <h2 id="mtitle"></h2>
+    <p id="mtext"></p>
+    <button id="mok"></button>
   </div>
 </div>
 <script>
@@ -228,6 +243,9 @@ function back() {
   delete fill[cur.r + "," + cur.c]; delete pen[cur.r + "," + cur.c];
 }
 function uncheck() { checked = false; }
+let wasFull = null, wasSolved = null;
+function popup(emo, title, text, btn) { $("memo").textContent = emo; $("mtitle").textContent = title; $("mtext").textContent = text; $("mok").textContent = btn; $("modal").classList.add("open"); $("mok").focus(); }
+function closePopup() { $("modal").classList.remove("open"); $("mok").blur(); }
 
 function render() {
   const w = wordAt(), inw = new Set(w.cells.map(x => x.join(",")));
@@ -257,6 +275,12 @@ function render() {
   $("status").textContent = checked
     ? (right === total ? "Perfect. Have fun storming the castle!" : `${wr} of ${words.length} answers right · ${total - right} squares to fix (correct letters shown in red)`)
     : (right === total ? "Solved! Have fun storming the castle!" : `${filled} of ${total} squares filled`);
+  const full = filled === total, solved = right === total;
+  if (wasFull !== null && !checked) {
+    if (solved && !wasSolved) popup("\u{1F478}", "You found the princess!", "Every square is correct. That was true love, or at least true spelling. Have fun storming the castle!", "See the finished puzzle");
+    else if (full && !solved && !wasFull) popup("\u{1F573}\uFE0F", "Not quite\u2026", "At least one letter is incorrect, but don't fall into the Pit of Despair. Keep going until you see the princess.", "Okay");
+  }
+  wasFull = full; wasSolved = solved;
   if (!document.body.classList.contains("touch")) w.li.scrollIntoView({ block: "nearest" });
   save();
 }
@@ -273,7 +297,10 @@ $("reveal").onclick = () => { checked = false; const k = cur.r + "," + cur.c; fi
 $("clear").onclick = () => { if (confirm("Start over?\n\nThis erases every letter you have entered, including pencil marks. It cannot be undone.")) { fill = {}; pen = {}; checked = false; cur = { r: 0, c: 0, dir: "a" }; render(); } };
 $("cluetxt").onclick = () => { flip(); render(); };
 
+$("mok").onclick = e => { e.stopPropagation(); closePopup(); };
+$("modal").onclick = e => { if (e.target === $("modal")) closePopup(); };
 document.addEventListener("keydown", e => {
+  if ($("modal").classList.contains("open")) { if (e.key === "Enter" || e.key === "Escape" || e.key === " ") closePopup(); e.preventDefault(); return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
   if (k === "Escape") { closeMenu(); return; }
