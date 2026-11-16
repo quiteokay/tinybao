@@ -24,10 +24,13 @@ export const PAINTS = ['#FFD6E0', '#CDEBFF', '#D9F5C8', '#FFE7A8', '#E3D5FF', '#
 
 export const nFloors = (S) => S.floors.length;
 export const roofFloor = (S) => S.floors.length;
-// Stairs zig-zag up the stairwell: flight f runs from stairX(f) on floor f to stairX(f + 1) on the floor above.
-// The last hop, from the top floor to the roof, is a ladder at stairX(top floor).
-export const stairX = (f) => ROOMW + (((f % 2) + 2) % 2 === 0 ? 20 : SWIDE - 20);
-const SWIDE = W - ROOMW;
+// Every floor has one staircase and one ladder up to the next floor, each inside a room,
+// in different columns that shift from floor to floor. A link runs from xa on floor f to xb on floor f + 1.
+const STAIR_COL = [0, 2, 1], LADDER_COL = [1, 0, 2], m3 = (f) => ((f % 3) + 3) % 3;
+export function links(f) {
+  const sx = STAIR_COL[m3(f)] * RW, lx = LADDER_COL[m3(f)] * RW + 172;
+  return [{ xa: sx + 34, xb: sx + 144, ladder: false }, { xa: lx, xb: lx, ladder: true }];
+}
 export const minFloor = (S) => (S.basement ? -1 : 0);
 // How far the grounds reach right now.
 export function ext(S) {
@@ -46,7 +49,6 @@ export function roomAt(S, x, floor) {
 export function roomName(S, x, floor) {
   if (floor >= S.floors.length) return 'roof';
   if (floor < 0) return 'basement';
-  if (x >= ROOMW && x <= W) return 'stairs';
   const r = roomAt(S, x, floor);
   return r ? ROOMS[r.type].name : 'garden';
 }
@@ -155,6 +157,22 @@ function makeBao(spec, x, floor) {
     needs: { hunger: rand(0.5, 0.9), energy: rand(0.6, 1), fun: rand(0.3, 0.8), social: rand(0.4, 0.9), clean: rand(0.5, 1) },
   };
 }
+// Baos the visitor can add, one a day. Thirty are ready with their own name and look;
+// seven flavours and nine accessories never line up the same way twice in that run.
+const ADD_NAMES = ['Wonton', 'Boba', 'Sago', 'Lychee', 'Mango', 'Dango', 'Jelly', 'Waffle', 'Noodle', 'Muffin', 'Toffee', 'Truffle', 'Crumpet', 'Pretzel', 'Radish',
+  'Turnip', 'Maple', 'Cocoa', 'Almond', 'Butter', 'Pumpkin', 'Walnut', 'Apricot', 'Raisin', 'Fennel', 'Dill', 'Congee', 'Pesto', 'Clem', 'Moon'];
+const ADD_FLAVORS = ['rosy', 'matcha', 'custard', 'taro', 'wheat', 'sesame', 'plain'], ADD_ACCS = ['beanie', 'flower', 'bowtie', 'cap', 'band', 'scarf', 'sprout', 'glasses', 'bow'];
+const ADD_TRAITS = ['sporty', 'dreamy', 'hungry', 'green', 'musical', 'tidy', 'mischief', 'nosy', 'doting', 'lazy'];
+export const ADDED = ADD_NAMES.map((name, i) => ({ name, flavor: ADD_FLAVORS[i % 7], acc: ADD_ACCS[i % 9], trait: ADD_TRAITS[i % 10] }));
+export const MAX_BAOS = 60;
+export function nextAdded(S) {
+  if (S.baos.length >= MAX_BAOS) return null;
+  const used = new Set(S.everNames), ready = ADDED.find((n) => !used.has(n.name)); if (ready) return ready;
+  // past the first thirty: make one up, the same one each time until it is used
+  const rnd = seeded(hashStr('extra:' + S.everNames.length)), A = ['Mi', 'Po', 'Tu', 'La', 'Ki', 'Bo', 'Nu', 'Zi', 'Pa', 'Mo', 'Lu', 'Shu'], B = ['mo', 'ki', 'bun', 'li', 'ro', 'pa', 'chi', 'do', 'mi', 'nu'];
+  let name; for (let i = 0; i < 40; i++) { name = A[Math.floor(rnd() * A.length)] + B[Math.floor(rnd() * B.length)]; if (!used.has(name)) break; name += ' ' + (S.everNames.length + 1); }
+  return { name, flavor: ADD_FLAVORS[Math.floor(rnd() * 7)], acc: ADD_ACCS[Math.floor(rnd() * 9)], trait: ADD_TRAITS[Math.floor(rnd() * 10)] };
+}
 export function nextNewcomer(S) {
   const used = new Set(S.everNames);
   return NEWCOMERS.find((n) => !used.has(n.name)) || null;
@@ -175,7 +193,7 @@ export function newState() {
     fire: { fuel: 0, logs: 2 },
     laundry: { basket: 0.4, machineEnd: 0, wet: false, line: 0, lineAt: 0 },
     planters: {}, flowers: [], snowbaos: [], snow: 0, wet: 0,
-    furn: {}, proj: null, projIdx: 0, done: {}, bare: {}, nopower: {}, trees: [], basement: false, veg: 0,
+    geo: 2, furn: {}, proj: null, projIdx: 0, done: {}, bare: {}, nopower: {}, trees: [], basement: false, veg: 0,
     weather: null, tray: null, diary: [], diarist: null,
     fish: 1,
   };

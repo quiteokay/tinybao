@@ -1,13 +1,14 @@
 // Boot, the frame loop, the camera, and the visitor's hands.
 import { RW, FH, W, OUT, BAO, clamp, clock, dayKey, hourOf } from './core.js';
-import { newState, nFloors, weatherAt, adults, ext, minFloor } from './world.js';
-import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, vaporize, ensureTray, initBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
+import { newState, nFloors, weatherAt, adults, ext, minFloor, nextAdded } from './world.js';
+import { drawBaoShape } from './drawbao.js';
+import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, vaporize, ensureTray, initBao, dropBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
 import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 3; // keep in step with version.json
+const VERSION = 4; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
 const TEST = ['speed', 'skipDays', 'hour', 'fresh', 'test'].some((k) => Q.has(k));
@@ -28,7 +29,18 @@ function serialize() {
 function save() { try { localStorage.setItem(KEY, serialize()); } catch (e) { /* private mode or full: carry on without saving */ } }
 function load() {
   if (Q.has('fresh')) return null;
-  try { const raw = localStorage.getItem(KEY); if (!raw) return null; const d = JSON.parse(raw); if (!d || !Array.isArray(d.floors) || !Array.isArray(d.baos)) return null; return Object.assign(newState0(), d); } catch (e) { return null; }
+  try { const raw = localStorage.getItem(KEY); if (!raw) return null; const d = JSON.parse(raw); if (!d || !Array.isArray(d.floors) || !Array.isArray(d.baos)) return null; migrate(d); return Object.assign(newState0(), d); } catch (e) { return null; }
+}
+function migrate(d) {
+  d.weather = null; // the weather is no longer the visitor's to set
+  // version 3 had a stairwell column on the right; the house is 110 narrower again, so the right-hand garden moves in with it
+  if (d.geo == null && d.done) {
+    const shift = (e, ground) => { if (ground && e.x > 570) e.x -= 110; else if (!ground && e.x > 554) e.x = 554; };
+    for (const list of [d.baos, d.objects, d.mess]) for (const e of list || []) shift(e, e.floor === 0);
+    for (const list of [d.flowers, d.trees, d.snowbaos]) for (const e of list || []) shift(e, true);
+    if (d.proj && d.proj.x != null) shift(d.proj, true);
+  }
+  d.geo = 2;
 }
 function newState0() { const s = newState(); s.baos = []; s.everNames = []; s.diarist = null; return s; }
 
@@ -94,7 +106,7 @@ const ptrs = new Map(); let down = null, pinch = null, armed = -1, zapOn = false
 function showTag(b) { tagFor = b; tagUntil = performance.now() + 4500; }
 function setHint(text) { const h = $('hint'); if (text) { h.textContent = text; h.hidden = false; } else h.hidden = true; }
 function setZap(on) { zapOn = on; $('bZap').classList.toggle('on', on); setHint(on ? 'press and hold a bao to vaporize it · tap ⚡ to cancel' : armed >= 0 ? 'tap anywhere to drop it' : ''); }
-function setArmed(i) { armed = i; if (i >= 0 && zapOn) setZap(false); drawTray(); setHint(i >= 0 ? 'tap anywhere to drop it' : ''); }
+function setArmed(i) { armed = i; if (i >= 0 && zapOn) setZap(false); drawTray(); setHint(i === BAO_SLOT ? 'tap anywhere to drop the new bao in' : i >= 0 ? 'tap anywhere to drop it' : ''); }
 
 canvas.addEventListener('pointerdown', (e) => {
   snd.unlock();
@@ -169,14 +181,28 @@ function drawTray() {
     if (!it.used) { const cv = document.createElement('canvas'); thingIcon(cv, it.type); el.appendChild(cv); el.title = THINGS[it.type].name; el.addEventListener('pointerdown', (e) => trayDown(e, i, el)); }
     box.appendChild(el);
   });
+  // one new bao a day
+  const sep = document.createElement('div'); sep.className = 'sep'; box.appendChild(sep);
+  const spec = nextAdded(S), free = spec && !S.tray.bao.used, el = document.createElement('div');
+  el.className = 'slot bao' + (free ? '' : ' used') + (armed === BAO_SLOT ? ' armed' : '');
+  if (free) { const cv = document.createElement('canvas'); baoIcon(cv, spec); el.appendChild(cv); el.title = spec.name + ' would like to move in'; el.addEventListener('pointerdown', (e) => trayDown(e, BAO_SLOT, el)); }
+  box.appendChild(el);
   trayNoteAt = 0; updateTrayNote();
 }
+const BAO_SLOT = 3;
+function baoIcon(canvas, spec) {
+  const dpr = Math.min(3, window.devicePixelRatio || 1), s = 52;
+  canvas.width = s * dpr; canvas.height = s * dpr; canvas.style.width = canvas.style.height = s + 'px';
+  const c = canvas.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.lineJoin = 'round';
+  c.translate(s / 2, s * 0.8); c.scale(0.9, 0.9); drawBaoShape(c, { flavor: spec.flavor, acc: spec.acc, expr: 'joy' }, 0);
+}
+const trayAllUsed = () => S.tray.items.every((i) => i.used) && (S.tray.bao.used || !nextAdded(S));
 // Under the tray: once today's things are used, count down to midnight (the visitor's own clock).
 let trayNoteAt = 0;
 function updateTrayNote() {
   if (performance.now() < trayNoteAt) return; trayNoteAt = performance.now() + 1000;
   let text = 'today’s things';
-  if (S.tray.items.every((i) => i.used)) {
+  if (trayAllUsed()) {
     const d = new Date(clock.t); d.setHours(24, 0, 0, 0);
     const mins = Math.ceil((d.getTime() - clock.t) / 60000), h = Math.floor(mins / 60), m = mins % 60;
     text = mins <= 1 ? 'new things any moment now' : h ? `new things in ${h}h ${String(m).padStart(2, '0')}m` : `new things in ${m}m`;
@@ -184,6 +210,10 @@ function updateTrayNote() {
   const el = $('trayNote'); if (el.textContent !== text) el.textContent = text;
 }
 function useTray(i, x, h) {
+  if (i === BAO_SLOT) {
+    if (S.tray.bao.used) return; const b = dropBao(x, Math.max(h, minFloor(S) * FH) + 2); if (!b) return;
+    S.tray.bao.used = true; snd.play('whoosh'); setArmed(-1); showTag(b); save(); return;
+  }
   const it = S.tray.items[i]; if (!it || it.used) return;
   dropThing(it.type, x, Math.max(h, minFloor(S) * FH) + 2); snd.play('whoosh'); it.used = true; setArmed(-1); save();
 }
@@ -191,7 +221,7 @@ function trayDown(e, i, el) {
   e.preventDefault(); snd.unlock(); el.setPointerCapture(e.pointerId);
   const sx = e.clientX, sy = e.clientY; let ghost = null, moved = false;
   const mv = (ev) => {
-    if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { moved = true; ghost = document.createElement('canvas'); ghost.id = 'ghost'; thingIcon(ghost, S.tray.items[i].type); document.body.appendChild(ghost); el.style.opacity = 0.3; }
+    if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { moved = true; ghost = document.createElement('canvas'); ghost.id = 'ghost'; if (i === BAO_SLOT) baoIcon(ghost, nextAdded(S)); else thingIcon(ghost, S.tray.items[i].type); document.body.appendChild(ghost); el.style.opacity = 0.3; }
     if (ghost) { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; }
   };
   const up = (ev) => {
@@ -204,14 +234,6 @@ function trayDown(e, i, el) {
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 }
 
-// ---------- weather button ----------
-const WX = { sun: '<circle cx="12" cy="12" r="4.5" fill="#FFD166"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
-  rain: '<path d="M7 15a4 4 0 0 1 .6-8 5 5 0 0 1 9.6 1.2A3.4 3.4 0 0 1 17 15z" fill="#DCE8F2"/><path d="M8.5 18l-1 2.5M12.5 18l-1 2.5M16.5 18l-1 2.5" stroke="#5FA8DC"/>',
-  snow: '<path d="M7 14a4 4 0 0 1 .6-8 5 5 0 0 1 9.6 1.2A3.4 3.4 0 0 1 17 14z" fill="#F1F6FA"/><g stroke="#7FBDE6"><path d="M8 18.5h.01M12 20h.01M16 18.5h.01M10 21.5h.01M14 17h.01" stroke-width="2.4"/></g>',
-  auto: '<circle cx="9" cy="9" r="3.5" fill="#FFD166"/><path d="M9 19a3.5 3.5 0 0 1 .5-7 4.5 4.5 0 0 1 8.6 1A3 3 0 0 1 18 19z" fill="#fff"/>' };
-function drawWeatherBtn() { const k = S.weather || 'auto'; $('bWeather').innerHTML = `<svg viewBox="0 0 24 24">${WX[k]}</svg>`; $('bWeather').title = 'Weather: ' + ({ auto: 'as it comes', sun: 'sunny', rain: 'rain', snow: 'snow' }[k]); }
-$('bWeather').addEventListener('click', () => { snd.unlock(); snd.play('tick'); const order = [null, 'sun', 'rain', 'snow']; S.weather = order[(order.indexOf(S.weather || null) + 1) % 4]; drawWeatherBtn();
-  setHint({ null: 'weather: as it comes', sun: 'weather: sunny', rain: 'weather: rain', snow: 'weather: snow' }[S.weather]); clearTimeout(drawWeatherBtn.t); drawWeatherBtn.t = setTimeout(() => { if (!zapOn && armed < 0) setHint(''); }, 1400); save(); });
 $('bZap').addEventListener('click', () => { snd.unlock(); snd.play('tick'); setArmed(-1); setZap(!zapOn); });
 function drawSoundBtn() { const m = snd.isMuted(); $('bSound').innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="#FFF3D6"/>${m ? '<path d="M16 9.5l5 5M21 9.5l-5 5"/>' : '<path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'}</svg>`; $('bSound').title = m ? 'Sound is off' : 'Sound is on'; $('bSound').setAttribute('aria-pressed', String(!m)); }
 $('bSound').addEventListener('click', () => { snd.unlock(); snd.setMuted(!snd.isMuted()); drawSoundBtn(); snd.play('pet'); });
@@ -334,7 +356,7 @@ function boot() {
     const star = pool[Math.floor(Math.random() * pool.length)]; S.lastStar = star.id; startFollow(star, true);
   }
   announceUpdate();
-  bootDay = S.tray.day; drawTray(); drawWeatherBtn(); drawSoundBtn(); save();
+  bootDay = S.tray.day; drawTray(); drawSoundBtn(); save();
   setInterval(save, 8000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);

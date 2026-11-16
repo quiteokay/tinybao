@@ -58,3 +58,8 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 
 #bSound { position: fixed; z-index: 4; right: 12px; top: max(12px, env(safe-area-inset-top)); width: 40px; height: 40px; }
 #bSound svg { width: 22px; height: 22px; }
+
+.slot.bao { background: #FFE3EC; }
+.slot.bao.used { background: transparent; }
+#slots .sep { width: 2px; align-self: stretch; margin: 6px 0; background: rgba(58,42,34,.18); border-radius: 2px; }
+@media (max-width: 430px) { #slots { gap: 5px; padding: 5px 6px; } .slot { width: 49px; height: 49px; border-radius: 13px; } .slot canvas { transform: scale(.9); } }

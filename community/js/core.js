@@ -2,9 +2,8 @@
 export const RW = 190;      // room width (world units)
 export const FH = 120;      // floor height
 export const COLS = 3;
-export const ROOMW = RW * COLS; // width of the three room columns
-export const SW = 110;           // the stairwell column on the right
-export const W = ROOMW + SW;     // whole building width
+export const W = RW * COLS; // building width
+export const ROOMW = W;
 export const SLAB = 10;
 export const BAO = 42;      // adult bao width
 export const OUT = 250;     // how far the garden reaches on day one; it spreads as things get built

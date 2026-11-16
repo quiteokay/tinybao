@@ -1,7 +1,7 @@
 // Puts the whole scene on the canvas: sky, garden, building, baos, lighting.
 import { RW, FH, COLS, W, ROOMW, SLAB, BAO, OUT, INK, clock, clamp, lerp, darkness, seeded } from './core.js';
-import { ROOMS, stairX, roofFloor, nFloors, weatherAt, roomAt, ext, walled, WALLWIN } from './world.js';
-import { drawGrounds, drawBasement, drawPins, drawBallGames, drawStairwell, drawFlights, boatShape, LIGHTS } from './drawsites.js';
+import { ROOMS, roofFloor, nFloors, weatherAt, roomAt, ext, walled, WALLWIN } from './world.js';
+import { drawGrounds, drawBasement, drawPins, drawBallGames, drawFlights, boatShape, LIGHTS } from './drawsites.js';
 import { drawBaoShape, bubble, icon } from './drawbao.js';
 import { FX, TH, B, drawCarry, drawProp } from './drawthings.js';
 import { R } from './sim.js';
@@ -103,11 +103,6 @@ function drawMarks(c, S, f, col, x0, y0, type, t) {
   }
 }
 
-function drawLadder(c, x, y0, top) {
-  c.strokeStyle = '#B98A5E'; c.lineCap = 'round'; c.lineWidth = 3;
-  c.beginPath(); c.moveTo(x - 8, y0); c.lineTo(x - 8, top); c.moveTo(x + 8, y0); c.lineTo(x + 8, top); c.stroke();
-  c.lineWidth = 2.4; c.beginPath(); for (let y = y0 - 10; y > top + 4; y -= 13) { c.moveTo(x - 8, y); c.lineTo(x + 8, y); } c.stroke();
-}
 
 function poseOf(b, t) {
   const ph = (b.ph ??= Math.random() * 6), sz = b.size || 1;
@@ -210,7 +205,6 @@ export function render(c, V, S, t) {
     else { const on = d > 0.25 && lit.has(f + ',' + col); c.beginPath(); c.moveTo(lx - 7, top + 20); c.lineTo(lx - 4, top + 12); c.lineTo(lx + 4, top + 12); c.lineTo(lx + 7, top + 20); c.closePath(); c.fillStyle = on ? '#FFE9A8' : '#E4DCCB'; c.fill(); c.lineWidth = 1.2; c.stroke(); if (on) LIGHTS.push({ x: lx, y: top + 22, r: 60 }); }
     if (col > 0) { c.fillStyle = '#EAD7BF'; c.strokeStyle = INK; c.lineWidth = 1.3; c.beginPath(); c.roundRect(x0 - 3, top - 1, 6, FH - SLAB - 50, [0, 0, 3, 3]); c.fill(); c.stroke(); }
   }
-  drawStairwell(c, S, nf);
   // floor slabs, outer walls, roof
   c.fillStyle = '#E9D5BC'; c.strokeStyle = INK; c.lineWidth = 1.6;
   for (let f = 0; f <= nf; f++) { c.fillStyle = '#EAD7BF'; c.beginPath(); c.rect(-8, -f * FH, W + 16, SLAB); c.fill(); c.stroke(); }
@@ -223,7 +217,7 @@ export function render(c, V, S, t) {
   if (S.snow > 0.05) { c.globalAlpha = S.snow; B(c, -14, topY - 10, W + 28, 6, 3, '#fff', 0); B(c, chx - 15, topY - 54, 30, 5, 2, '#fff', 0); c.globalAlpha = 1; }
 
   // ladders, furniture
-  drawFlights(c, S, nf); drawLadder(c, stairX(nf - 1), -(nf - 1) * FH, -nf * FH - 14);
+  drawFlights(c, S, nf);
   drawPins(c, S, t);
   const drag = R.drag;
   for (const f of R.fx) if (FX[f.kind] && !(f.floor === 0 && (f.x < 0 || f.x > W)) && !(drag && f.mid === drag.mid)) { c.save(); c.translate(f.x, -f.floor * FH); FX[f.kind](c, f, S, t); c.restore(); }

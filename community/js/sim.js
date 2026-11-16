@@ -1,7 +1,7 @@
 // What the baos do. Each bao has hidden needs and picks its own next activity;
 // chores come from the state of the house. Nothing here is steered by the visitor.
 import { RW, FH, COLS, W, ROOMW, OUT, BAO, clamp, rand, randInt, pick, chance, uid, clock, isNight, darkness, dayKey, hourOf, seeded, hashStr } from './core.js';
-import { ROOMS, PAINTS, PROJ, ORDER, TREE_SLOTS, buildFixtures, stairX, minFloor, ext, roofFloor, nFloors, xBounds, roomAt, roomName, whereIs, roomsOf, roomSpot, bedCount, adults, babyOf,
+import { ROOMS, PAINTS, PROJ, ORDER, TREE_SLOTS, buildFixtures, links, nextAdded, minFloor, ext, roofFloor, nFloors, xBounds, roomAt, roomName, whereIs, roomsOf, roomSpot, bedCount, adults, babyOf,
   nextNewcomer, addNewcomer, addFloor, canGrow, weatherAt, addMark, wallSpot } from './world.js';
 import { log, THINGS } from './diary.js';
 
@@ -61,6 +61,7 @@ export function init(S) {
   for (const [k, v] of [['furn', {}], ['done', {}], ['bare', {}], ['nopower', {}], ['trees', []], ['projIdx', 0], ['veg', 0]]) if (S[k] == null) S[k] = v;
   if (S.build) { S.proj = { id: 'floor', p: S.build.p * 0.59 }; delete S.build; } // saves from the first version
   R.fx = buildFixtures(S);
+  if (S.tray && !S.tray.bao) S.tray.bao = { used: false };
   if (!S.proj) startNext(S, true);
   S.baos.forEach(initBao);
   S.objects.forEach((o) => { o.alt = 0; o.vy = 0; o.falling = false; o.heldBy = null; o.held = false; });
@@ -110,11 +111,13 @@ function moveToward(b, tg, dt) {
   const S = R.S, top = S.floors.length - 1, tf = clamp(tg.floor, minFloor(S), roofFloor(S));
   if (b.floor !== tf) {
     if (b.kind === 'baby') return true; // babies cannot manage stairs
-    const up = tf > b.floor;
-    // going up from the top floor (or down from the roof) is a ladder; everything else is a flight of stairs
-    const ladder = up ? b.floor === top : b.floor === top + 1;
-    const from = up ? stairX(b.floor) : (ladder ? stairX(top) : stairX(b.floor));
-    const to = ladder ? from : (up ? stairX(b.floor + 1) : stairX(b.floor - 1));
+    // each floor has a staircase and a ladder; take whichever makes the shorter trip
+    const up = tf > b.floor, last = (up ? b.floor + 1 : b.floor - 1) === tf;
+    let from = 0, to = 0, ladder = false, bc = 1e9;
+    for (const L of links(up ? b.floor : b.floor - 1)) {
+      const f0 = up ? L.xa : L.xb, t0 = up ? L.xb : L.xa, cost = Math.abs(b.x - f0) + (last ? Math.abs(t0 - tg.x) : 0) + (L.ladder ? 14 : 0);
+      if (cost < bc) { bc = cost; from = f0; to = t0; ladder = L.ladder; }
+    }
     if (Math.abs(b.x - from) < 1.5) {
       b.x = from;
       if (up) b.climb = { dir: 1, p: 0, xa: from, xb: to, ladder };
@@ -173,6 +176,14 @@ function runBao(S, b, dt) {
 function carryBaby(b, baby) { abort(baby); baby.carriedBy = b.id; baby.sleeping = false; }
 function pickUpThing(b, o) { o.heldBy = b.id; b.carry = { obj: o }; o.unseen = false; }
 function putDown(b) { if (b.carry && b.carry.obj) { const o = b.carry.obj; o.heldBy = null; o.x = b.x + b.facing * 6; o.floor = b.floor; o.alt = 0; } b.carry = null; }
+// Wake whoever has gone longest without a turn, to keep the house company.
+function wakeForWatch(S, except) {
+  const pool = adults(S).filter((o) => o !== except && o.sleeping && !o.held); if (!pool.length) return null;
+  const o = pool.sort((p, q) => (p.lastWatch || 0) - (q.lastWatch || 0))[0];
+  abort(o); o.owl = clock.t + 2.2 * 3600000; o.lastWatch = clock.t; o.watchSince = clock.t; o.needs.hunger = Math.min(o.needs.hunger, 0.45); o.needs.fun = Math.min(o.needs.fun, 0.4);
+  if (isNight()) log(S, 'night_watch', { a: o }, { p: 0.35 });
+  return o;
+}
 function untilMorning(b) {
   const h = clock.hour(), wake = 6.5 + rand(0, 1.2) + (b.trait === 'lazy' ? 1 : 0);
   return ((wake - h + 24) % 24) * 3600;
@@ -214,6 +225,14 @@ const ACTS = [
   { id: 'sleep', tags: ['rest'], label: 'asleep', try(S, b, h) {
     const night = isNight(h), u = U(b.needs.energy);
     if ((!night && !u) || b.owl > clock.t) return;
+    // somebody is always up: the last bao awake stays on watch, and hands over after a couple of hours
+    const others = adults(S).filter((o) => o !== b);
+    if (others.length && !others.some((o) => !o.sleeping && o.act !== 'sleep')) {
+      if (!b.watchSince) b.watchSince = clock.t;
+      if (clock.t - b.watchSince > 2 * 3600000) { wakeForWatch(S, b); b.watchSince = 0; }
+      return;
+    }
+    b.watchSince = 0;
     const spot = night ? (freeFx('bed', b) || freeFx('sofa', b) || freeFx('armchair', b)) : (freeFx('sofa', b) || freeFx('armchair', b) || freeFx('bed', b));
     const dur = night ? untilMorning(b) : rand(25, 50);
     const step = act(dur, { pose: 'sleep', expr: 'sleep', alt: spot ? spot.alt : 0, front: spot && spot.kind === 'bed' ? 'blanket' : null, soft: true, sleep: true,
@@ -681,9 +700,23 @@ export function releaseBao(b) {
   b.x = clamp(b.x, lo, hi); b.floor = f; b.alt = Math.max(0, h - f * FH); b.held = false; b.fall = true; b.vy = 0;
 }
 function landedBao(S, b) {
+  if (b.hand) { // a bao the visitor has just added
+    b.hand = false; b.fromRoom = null; const others = adults(S).filter((q) => q !== b);
+    log(S, 'hand_arrival', { a: b, b: others.length ? pick(others) : b, room: whereIs(S, b.x, b.floor) }, { important: true });
+    addMark(S, { k: 'photo', what: 'arrival' }); startleNear(S, b.x, b.floor, 230);
+    return;
+  }
   const room = whereIs(S, b.x, b.floor);
   if (b.fromRoom && room !== b.fromRoom && b.kind !== 'baby') log(S, 'moved', { a: b, from: b.fromRoom, room }, { p: 0.55, gap: 120 });
   b.fromRoom = null;
+}
+// The visitor adds a new resident: it drops in wherever they let go.
+export function dropBao(x, h) {
+  const S = R.S, spec = nextAdded(S); if (!spec) return null;
+  const b = addNewcomer(S, spec, false); initBao(b);
+  const f = landFloor(S, x, h), [lo, hi] = xBounds(S, f);
+  Object.assign(b, { x: clamp(x, lo, hi), floor: f, alt: Math.max(0, h - f * FH), fall: true, vy: 0, hand: true });
+  return b;
 }
 export function dropThing(type, x, h) {
   const S = R.S, f = landFloor(S, x, h), [lo, hi] = xBounds(S, f);
@@ -758,7 +791,7 @@ export function ensureTray(S) {
     const rnd = seeded(hashStr(today + ':' + S.created)), pool = Object.keys(THINGS); items = [];
     while (items.length < 3) { const k = pool[Math.floor(rnd() * pool.length)]; if (!items.includes(k)) items.push(k); }
   }
-  S.tray = { day: today, items: items.map((type) => ({ type, used: false })) };
+  S.tray = { day: today, items: items.map((type) => ({ type, used: false })), bao: { used: false } };
   if (R.onChange) R.onChange('tray');
 }
 function arrive(S, live, t) {
@@ -855,6 +888,7 @@ function tickWorld(S, dt) {
   const h = clock.hour(), w = weatherAt(S);
   if (dayKey(clock.t) !== S.day) newDay(S, clock.t, true);
   ensureTray(S); // checked on its own: time away can move the day on without passing through here
+  { const ad = adults(S); if (ad.length > 1 && ad.every((q) => q.sleeping)) wakeForWatch(S, null); }
   if (S.pendingArrival && clock.t >= S.pendingArrival) { S.pendingArrival = 0; arrive(S, true); }
   if (S.fire.fuel > 0) S.fire.fuel = Math.max(0, S.fire.fuel - dt / 380);
   const L = S.laundry;
@@ -914,8 +948,7 @@ export function settle() {
   for (const b of S.baos) { endPlan(b); b.climb = null; b.alt = 0; b.fall = false; b.held = false; }
   const baby = babyOf(S), crib = fxs('crib')[0];
   if (baby && crib && isNight()) putBabyToBed(S, baby, crib);
-  for (const b of S.baos) {
-    if (b.plan) continue;
+  const place = (b) => {
     choose(S, b);
     let guard = 0;
     while (b.plan && b.si < b.plan.length && guard++ < 12) {
@@ -928,7 +961,11 @@ export function settle() {
       } else if (st.call) { const p = b.plan; st.call(b); if (b.plan !== p) break; b.si++; }
       else { b.st = Math.min(st.act * 0.6, rand(0, st.act)); if (st.sleep) b.st = 0; break; }
     }
-  }
+  };
+  for (const b of S.baos) if (!b.plan) place(b);
+  // never a house with everybody asleep
+  const ad = adults(S);
+  if (ad.length > 1 && ad.every((q) => q.sleeping || q.act === 'sleep')) { const o = wakeForWatch(S, null) || ad[0]; endPlan(o); o.owl = clock.t + 2.2 * 3600000; place(o); }
 }
 
 // While the visitor was away: a coarse version of life, hour by hour.

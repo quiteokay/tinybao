@@ -1,7 +1,7 @@
 // Everything the community builds: porch, garden, patio, courts, basement bowling, lake, boat, trees, stairs.
 // Each thing can be drawn part-built: it appears bit by bit, bare wood first, then paint, then lights.
 import { FH, W, ROOMW, SLAB, INK, clock, clamp } from './core.js';
-import { stairX, minFloor, nFloors, ext } from './world.js';
+import { links, minFloor, nFloors, ext } from './world.js';
 import { B } from './drawthings.js';
 
 const BARE = '#DCCBB0';
@@ -161,19 +161,22 @@ export function drawBallGames(c, S, t) {
 }
 
 // Stairs zig-zag up the stairwell; the last climb to the roof is a ladder.
-export function drawStairwell(c, S, nf, wallOf) {
-  for (let f = 0; f < nf; f++) { const y0 = -f * FH, top = y0 - FH + SLAB;
-    c.fillStyle = S.bare[f + ',2'] != null ? '#E6E0D6' : '#EFE3D0'; c.fillRect(ROOMW, top, W - ROOMW, FH - SLAB);
-    c.fillStyle = 'rgba(160,125,90,.28)'; c.fillRect(ROOMW, y0 - 30, W - ROOMW, 30);
-    c.fillStyle = '#EAD7BF'; c.strokeStyle = INK; c.lineWidth = 1.3; c.beginPath(); c.roundRect(ROOMW - 3, top - 1, 6, FH - SLAB - 50, [0, 0, 3, 3]); c.fill(); c.stroke(); }
-}
 export function drawFlights(c, S, nf) {
   const n = 8;
-  for (let f = minFloor(S); f < nf - 1; f++) {
-    const xa = stairX(f), xb = stairX(f + 1), ya = -f * FH, dir = Math.sign(xb - xa), run = Math.abs(xb - xa) / n, rise = FH / n;
+  for (let f = minFloor(S); f < nf; f++) for (const L of links(f)) {
+    const ya = -f * FH;
+    if (L.ladder) {
+      c.strokeStyle = '#B98A5E'; c.lineCap = 'round'; c.lineWidth = 3; const top = ya - FH - 14;
+      c.beginPath(); c.moveTo(L.xa - 8, ya); c.lineTo(L.xa - 8, top); c.moveTo(L.xa + 8, ya); c.lineTo(L.xa + 8, top); c.stroke();
+      c.lineWidth = 2.4; c.beginPath(); for (let y = ya - 10; y > top + 4; y -= 13) { c.moveTo(L.xa - 8, y); c.lineTo(L.xa + 8, y); } c.stroke();
+      continue;
+    }
+    const xa = L.xa, xb = L.xb, run = (xb - xa) / n, rise = FH / n;
+    // the opening in the floor above, where the stairs come out
+    c.fillStyle = '#C9B79C'; c.fillRect(xb - 38, ya - FH, 42, SLAB); c.strokeStyle = INK; c.lineWidth = 1.2; c.strokeRect(xb - 38, ya - FH, 42, SLAB);
     c.beginPath(); c.moveTo(xa, ya);
-    for (let i = 0; i < n; i++) { c.lineTo(xa + dir * run * i, ya - rise * (i + 1)); c.lineTo(xa + dir * run * (i + 1), ya - rise * (i + 1)); }
-    c.lineTo(xb, ya - FH + 12); c.lineTo(xa + dir * 10, ya); c.closePath();
+    for (let i = 0; i < n; i++) { c.lineTo(xa + run * i, ya - rise * (i + 1)); c.lineTo(xa + run * (i + 1), ya - rise * (i + 1)); }
+    c.lineTo(xb, ya - FH + 12); c.lineTo(xa + 10, ya); c.closePath();
     c.fillStyle = '#D9B98C'; c.fill(); c.strokeStyle = INK; c.lineWidth = 1.3; c.stroke();
     c.beginPath(); c.moveTo(xa, ya - 24); c.lineTo(xb, ya - FH - 24); c.strokeStyle = '#8a5a3c'; c.lineWidth = 2.4; c.stroke();
     for (const u of [0, 0.5, 1]) ln(c, [xa + (xb - xa) * u, ya - FH * u, xa + (xb - xa) * u, ya - FH * u - 24], '#8a5a3c', 1.8);
