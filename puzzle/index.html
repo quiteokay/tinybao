@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-title" content="tiny bao puzzle">
 <link rel="apple-touch-icon" href="/lilbao_351.png">
 <link rel="icon" type="image/png" href="/lilbao_351.png">
-<title>Anybody Want a Peanut? · tiny bao crossword</title>
+<title>Anybody Want a Peanut? &#129372; · tiny bao crossword</title>
 <style>
   :root {
     --bg: #f4f1ea; --ink: #1c1b19; --muted: #6d685f; --line: #2a2926;
@@ -35,12 +35,12 @@
   .cluebar button:active { background: rgba(0,0,0,.12); }
   .cluebar .txt { flex: 1; display: flex; align-items: center; padding: 6px 4px; font-size: 16px; line-height: 1.25; }
   .cluebar .txt b { margin-right: 8px; white-space: nowrap; font-family: system-ui, sans-serif; font-size: 14px; }
-  #grid { display: grid; grid-template-columns: repeat(15, 1fr); border: 2px solid var(--line); background: var(--line); gap: 1px; user-select: none; -webkit-user-select: none; }
+  #grid { display: grid; grid-template-columns: repeat(16, 1fr); border: 2px solid var(--line); background: var(--line); gap: 1px; user-select: none; -webkit-user-select: none; }
   .c { position: relative; background: var(--cell); aspect-ratio: 1; container-type: inline-size; cursor: pointer; }
   .c.b { background: var(--block); cursor: default; }
   #gridwrap { position: relative; margin-top: 10px; }
   #cliffs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; mix-blend-mode: multiply; transition: opacity 2.5s ease; }
-  #gridwrap.solved #cliffs { opacity: .3; }
+  #gridwrap.solved #cliffs { opacity: .62; }
   #gridwrap.solved .c.w, #gridwrap.solved .c.cur { background: var(--cell); }
   .c.w { background: var(--word); }
   .c.cur { background: var(--cursor); }
@@ -65,7 +65,7 @@
 
   #kb { display: none; }
   @media (min-width: 900px) {
-    .wrap { grid-template-columns: minmax(0, 560px) minmax(0, 1fr); align-items: start; }
+    .wrap { grid-template-columns: minmax(0, 620px) minmax(0, 1fr); align-items: start; }
     .lists { max-height: calc(100vh - 110px); overflow: auto; padding-right: 6px; }
     .board { position: sticky; top: 10px; }
   }
@@ -102,7 +102,7 @@
 </head>
 <body>
 <header>
-  <h1>Anybody Want a Peanut?</h1>
+  <h1>Anybody Want a Peanut? &#129372;</h1>
   <div class="tools">
     <button id="pencil" aria-label="Pencil mode" aria-pressed="false" title="Pencil">&#9998;</button>
     <button id="menubtn" aria-label="Menu" aria-haspopup="true" title="Menu"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
@@ -193,9 +193,8 @@ ITSAGO:"\"We're all set!\" (3 wds.)", ACNE:"Teen's skin woe", FINAL:"End-of-seme
 RESOD:"Add grass to again", REFI:"New home loan, for short", INON:"Privy to (2 wds.)", NOR:"Neither's partner",
 BLEW:"Squandered, as a lead", RISE:"Get out of bed", SPF:"Sunscreen letters", TIL:"Up to, briefly", ONO:"Yoko of music"
 };
-// flipped along the diagonal so CLIFFSOFINSANITY runs top to bottom
-const ROWS = [...ORIG[0]].map((_, c) => ORIG.map(row => row[c]).join(""));
-const H = ROWS.length, W = ROWS[0].length, KEY = "tinybao-puzzle-asyouwish-v2", OLDKEY = "tinybao-puzzle-asyouwish-v1";
+const ROWS = ORIG;
+const H = ROWS.length, W = ROWS[0].length, KEY = "tinybao-puzzle-asyouwish-v3", FLIPKEY = "tinybao-puzzle-asyouwish-v2", OLDKEY = "tinybao-puzzle-asyouwish-v1";
 const sol = (r, c) => (r < 0 || c < 0 || r >= H || c >= W) ? "#" : ROWS[r][c];
 const cells = [], words = [];           // words: {dir, num, cells:[[r,c]], ans, clue, li}
 const at = {};                          // "r,c" -> {a: wordIndex, d: wordIndex}
@@ -217,10 +216,12 @@ words.forEach((w, i) => {
 
 words.forEach(w => { w.clue = w.clue.replace(/\{(\w+)\}/, (_, a) => { const t = words.find(x => x.ans === a); return t.num + (t.dir === "a" ? "-Across" : "-Down"); }); });
 let fill = {}, pen = {}, bad = {}, rev = {}, pencil = false, cur = { r: 0, c: 0, dir: "a" };
-try {   // carry progress over from the pre-flip layout
-  if (!localStorage.getItem(KEY) && localStorage.getItem(OLDKEY)) {
-    const o = JSON.parse(localStorage.getItem(OLDKEY)), t = m => Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k.split(",").reverse().join(","), v]));
-    localStorage.setItem(KEY, JSON.stringify({ fill: t(o.fill), pen: t(o.pen), bad: t(o.bad), rev: t(o.rev), pencil: o.pencil, cur: o.cur ? { r: o.cur.c, c: o.cur.r, dir: o.cur.dir === "a" ? "d" : "a" } : null }));
+try {   // carry progress over from earlier layouts (v2 was flipped along the diagonal)
+  if (!localStorage.getItem(KEY)) {
+    if (localStorage.getItem(FLIPKEY)) {
+      const o = JSON.parse(localStorage.getItem(FLIPKEY)), t = m => Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k.split(",").reverse().join(","), v]));
+      localStorage.setItem(KEY, JSON.stringify({ fill: t(o.fill), pen: t(o.pen), bad: t(o.bad), rev: t(o.rev), pencil: o.pencil, cur: o.cur ? { r: o.cur.c, c: o.cur.r, dir: o.cur.dir === "a" ? "d" : "a" } : null }));
+    } else if (localStorage.getItem(OLDKEY)) localStorage.setItem(KEY, localStorage.getItem(OLDKEY));
   }
 } catch (e) {}
 try { const s = JSON.parse(localStorage.getItem(KEY) || "{}"); fill = s.fill || {}; pen = s.pen || {}; bad = s.bad || {}; rev = s.rev || {}; pencil = !!s.pencil; if (s.cur) cur = s.cur; } catch (e) {}
