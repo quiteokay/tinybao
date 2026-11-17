@@ -55,7 +55,7 @@
   #gridwrap.solved #cliffs { opacity: .62; }
   #climber { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; transition: opacity 2.5s ease 1s; }
   #gridwrap.solved #climber { opacity: .85; }
-  #gridwrap.solved .c.w, #gridwrap.solved .c.cur { background: var(--cell); }
+  #gridwrap.solved:not(.review) .c.w, #gridwrap.solved:not(.review) .c.cur { background: var(--cell); }
   .c.w { background: var(--word); }
   .c.cur { background: var(--cursor); }
   .c .n { position: absolute; top: 2cqw; left: 5cqw; font: 26cqw/1 system-ui, sans-serif; color: #444; }
@@ -64,6 +64,10 @@
   .c.bad { background: var(--badbg); }
   .c.rev { background: var(--revbg); }
   .c.cur { background: var(--cursor); }
+  @keyframes flrev { 0%, 55% { background: #8fd6a0; } }
+  @keyframes flbad { 0%, 55% { background: #f2a0a0; } }
+  .c.flrev { animation: flrev 1s ease-out; }
+  .c.flbad { animation: flbad 1s ease-out; }
 
   .actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
   .actions button { padding: 10px 16px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); font-family: system-ui, sans-serif; font-size: 15px; font-weight: 600; }
@@ -76,6 +80,7 @@
   .lists li b { flex: 0 0 24px; text-align: right; font-family: system-ui, sans-serif; font-size: 13px; padding-top: 1px; }
   .lists li.on { background: var(--word); }
   .lists li.done span { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
+  .lists.solved li.done span { color: inherit; text-decoration: none; }
 
   #kb { display: none; }
   @media (min-width: 900px) {
@@ -209,7 +214,7 @@ OAR:"Rowboat need", RILES:"Irritates", ANTS:"Picnic crashers",
 PREPARE:"\"___ to die\" (end of Inigo Montoya's famous greeting)", SPICE:"Cumin or cardamom",
 AMSO:"\"I ___ hungry I could eat a horse\" (2 wds.)", AMAT:"Latin for \"she loves\"", FAR:"A long way off",
 PRINCESSBRIDE:"With \"The,\" 1987 fairy-tale film celebrated in this puzzle",
-STOLENON:"Crept up to unnoticed, old-style (2 wds.)", SALINAS:"Steinbeck's California hometown",
+STOLENON:"Approached stealthily, old-style (2 wds.)", SALINAS:"Steinbeck's California hometown",
 PINAFORE:"Gilbert and Sullivan's \"H.M.S. ___\"", AGESAGO:"Way back when (2 wds.)",
 FLORIN:"Buttercup's homeland, ruled by Prince Humperdinck", TOWELED:"Dried (off) after a shower",
 ANTIC:"Zany stunt", DIANE:"Actress Keaton", DANCE:"Waltz or tango", EGGO:"Waffle brand you might \"leggo\"", DARN:"\"Shoot!\"",
@@ -246,7 +251,7 @@ words.forEach((w, i) => {
 });
 
 words.forEach(w => { w.clue = w.clue.replace(/\{(\w+)\}/, (_, a) => { const t = words.find(x => x.ans === a); return t.num + (t.dir === "a" ? "-Across" : "-Down"); }); });
-let fill = {}, pen = {}, bad = {}, rev = {}, pencil = false, cur = { r: 0, c: 0, dir: "a" };
+let fill = {}, pen = {}, bad = {}, rev = {}, fl = {}, review = false, pencil = false, cur = { r: 0, c: 0, dir: "a" };
 try {   // carry progress over from earlier layouts (v2 was flipped along the diagonal)
   if (!localStorage.getItem(KEY)) {
     if (localStorage.getItem(FLIPKEY)) {
@@ -304,8 +309,22 @@ function type(ch) {
 function back() {
 
   const w = wordAt(), k = w.cells.findIndex(([r, c]) => r === cur.r && c === cur.c);
-  if (!get(cur.r, cur.c) && k > 0) { cur.r = w.cells[k - 1][0]; cur.c = w.cells[k - 1][1]; }
+  if (!get(cur.r, cur.c)) {
+    if (k > 0) { cur.r = w.cells[k - 1][0]; cur.c = w.cells[k - 1][1]; }
+    else {   // at the start of a word: hop to the last square of the previous clue
+      const p = words[(at[cur.r + "," + cur.c][cur.dir] - 1 + words.length) % words.length], e = p.cells[p.cells.length - 1];
+      cur.dir = p.dir; cur.r = e[0]; cur.c = e[1];
+    }
+  }
   delete fill[cur.r + "," + cur.c]; delete pen[cur.r + "," + cur.c]; delete bad[cur.r + "," + cur.c]; delete rev[cur.r + "," + cur.c];
+}
+
+function arrow(dir, dr, dc) {   // an arrow across the current direction turns first, then moves
+  if (cur.dir !== dir && at[cur.r + "," + cur.c][dir] !== undefined) cur.dir = dir; else move(dr, dc);
+}
+function flash(keys, cls) {   // brief colour pulse so reveals always give feedback, even under the cursor
+  keys.forEach(k => { const [r, c] = k.split(",").map(Number), d = cells[r][c]; d.classList.remove(cls); void d.offsetWidth; d.classList.add(cls); fl[k] = cls; });
+  setTimeout(() => keys.forEach(k => { if (fl[k] === cls) { delete fl[k]; const [r, c] = k.split(",").map(Number); cells[r][c].classList.remove(cls); } }), 1000);
 }
 
 let wasFull = null, wasSolved = null;
@@ -319,7 +338,7 @@ function render() {
     if (sol(r, c) === "#") continue;
     const d = cells[r][c], v = get(r, c), k = r + "," + c, good = v === sol(r, c);
     total++; if (v) filled++; if (good) right++;
-    d.className = "c" + (inw.has(k) ? " w" : "") + (pen[k] ? " p" : "") + (bad[k] ? " bad" : "") + (rev[k] ? " rev" : "") + (r === cur.r && c === cur.c ? " cur" : "");
+    d.className = "c" + (inw.has(k) ? " w" : "") + (pen[k] ? " p" : "") + (bad[k] ? " bad" : "") + (rev[k] ? " rev" : "") + (r === cur.r && c === cur.c ? " cur" : "") + (fl[k] ? " " + fl[k] : "");
     d.querySelector(".l").textContent = v;
 
   }
@@ -339,8 +358,12 @@ function render() {
     if (solved && !wasSolved) popup("\u{1F478}", "You found the princess!", "That was true love. Have fun storming the castle!", "See the finished puzzle");
     else if (full && !solved && !wasFull) popup("\u{1F573}\uFE0F", "Not quite\u2026", "At least one letter is incorrect, but don't fall into the Pit of Despair. Keep going until you see the princess.", "Okay");
   }
+  // just solved (or loaded solved): clear the highlights so the picture shows; any later interaction brings them back
+  review = !(solved && !wasSolved);
   wasFull = full; wasSolved = solved;
   $("gridwrap").classList.toggle("solved", solved);
+  $("gridwrap").classList.toggle("review", review);
+  document.querySelector(".lists").classList.toggle("solved", solved);
   if (!document.body.classList.contains("touch")) w.li.scrollIntoView({ block: "nearest" });
   save();
 }
@@ -356,10 +379,11 @@ $("mistakes").onclick = () => {
   let n = 0;
   for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const k = r + "," + c, v = get(r, c); if (v && v !== sol(r, c)) { bad[k] = 1; n++; } }
   render();
+  flash(Object.keys(bad), "flbad");
   if (!n) popup("\u2728", "No mistakes so far", "Every letter you have entered is correct. Keep going!", "Okay");
 };
 
-$("reveal").onclick = () => { const k = cur.r + "," + cur.c; fill[k] = sol(cur.r, cur.c); delete pen[k]; delete bad[k]; rev[k] = 1; render(); };
+$("reveal").onclick = () => { const k = cur.r + "," + cur.c; fill[k] = sol(cur.r, cur.c); delete pen[k]; delete bad[k]; rev[k] = 1; render(); flash([k], "flrev"); };
 $("clear").onclick = () => { if (confirm("Start over?\n\nThis erases every letter you have entered, including pencil marks. It cannot be undone.")) { fill = {}; pen = {}; bad = {}; rev = {}; cur = { r: 0, c: 0, dir: "a" }; render(); } };
 $("cluetxt").onclick = () => { flip(); render(); };
 
@@ -372,10 +396,10 @@ document.addEventListener("keydown", e => {
   if (k === "Escape") { closeMenu(); return; }
   if (/^[a-zA-Z]$/.test(k)) type(k.toUpperCase());
   else if (k === "Backspace" || k === "Delete") back();
-  else if (k === "ArrowRight") { if (cur.dir !== "a") cur.dir = at[cur.r + "," + cur.c].a !== undefined ? "a" : cur.dir; move(0, 1); }
-  else if (k === "ArrowLeft") move(0, -1);
-  else if (k === "ArrowDown") move(1, 0);
-  else if (k === "ArrowUp") move(-1, 0);
+  else if (k === "ArrowRight") arrow("a", 0, 1);
+  else if (k === "ArrowLeft") arrow("a", 0, -1);
+  else if (k === "ArrowDown") arrow("d", 1, 0);
+  else if (k === "ArrowUp") arrow("d", -1, 0);
   else if (k === " ") flip();
   else if (k === "Tab" || k === "Enter" || k === ">" || k === ".") step(e.shiftKey && k === "Tab" ? -1 : 1);
   else if (k === "<" || k === ",") step(-1);
