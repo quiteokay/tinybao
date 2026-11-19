@@ -17,13 +17,19 @@ export function unlock() {
   if (ctx.state === 'suspended') ctx.resume();
 }
 
+// Each sound's level, in dB, measured so every effect peaks between about -7 and -12 dBFS:
+// clearly above the music (which averages about -26 LUFS) without ever clipping.
+const LEVEL = { pet: 11, pick: 11, thud: 5, land: 5, whoosh: 14, blip: 13, tick: 15, pop: 6, drum: 5, shutter: 10, page: 22, arrive: 11, fanfare: 11, party: 7, steam: 1 };
+let lvl = 1; // the level of the sound being played right now
 function tone(f0, f1, dur, { type = 'sine', vol = 0.3, at = 0, attack = 0.008 } = {}) {
+  vol *= lvl;
   const t = ctx.currentTime + at, o = ctx.createOscillator(), g = ctx.createGain();
   o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
   g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.03);
 }
 function noise(dur, { vol = 0.2, at = 0, freq = 1200, q = 0.8, type = 'bandpass', sweep = 0 } = {}) {
+  vol *= lvl;
   const t = ctx.currentTime + at, n = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
   const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
@@ -56,5 +62,7 @@ const SOUNDS = {
 export function play(name) {
   if (muted || quiet || !ctx || ctx.state !== 'running' || !SOUNDS[name] || document.hidden) return;
   const now = ctx.currentTime; if (now - (lastPlayed[name] ?? -1) < 0.09) return; lastPlayed[name] = now;
+  lvl = Math.pow(10, (LEVEL[name] || 0) / 20);
   try { SOUNDS[name](); } catch (e) { /* sound is a nicety; never let it break the page */ }
+  lvl = 1;
 }

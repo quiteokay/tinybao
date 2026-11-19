@@ -124,7 +124,7 @@ function start() {
   setup(); if (!ctx || playing) return;
   if (ctx.state === 'suspended') ctx.resume();
   playing = true; nextBar = 0; nextTime = ctx.currentTime + 0.15;
-  out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(0.55, ctx.currentTime + 2.5);
+  out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 2.5);
   schedule(); timer = setInterval(schedule, 120);
 }
 function stop() {

@@ -1,5 +1,5 @@
 {
-  "v": 11,
+  "v": 12,
   "files": [
     "index.html",
     "style.css",
@@ -19,6 +19,12 @@
     "js/workshop.js"
   ],
   "changes": [
+    {
+      "v": 12,
+      "notes": [
+        "The music is softer now, and every little sound (pets, page turns, ticks) comes through clearly over it."
+      ]
+    },
     {
       "v": 11,
       "notes": [
