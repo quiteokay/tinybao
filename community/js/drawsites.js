@@ -58,11 +58,15 @@ const patio = (c, k) => {
   c.beginPath(); c.moveTo(x0 - 2, -50); c.quadraticCurveTo(cx, -40, x0 + 98, -50); c.strokeStyle = INK; c.lineWidth = 0.8; c.stroke();
   for (let i = 1; i < 7; i++) { const u = i / 7, x = x0 - 2 + u * 100, y = -50 + Math.sin(u * Math.PI) * 5; dot(c, x, y + 2, 2.2, k.on ? ['#FFD166', '#FF8FB1', '#9AD0EC'][i % 3] : '#d8d8d8', 0.6); if (k.on && i % 2) LIGHTS.push({ x, y: y + 2, r: 34 }); }
 };
+// the rim and the net, which also get drawn again over the ball as it drops through
+function hoopFront(c, rim) {
+  ln(c, [-489, -78, -474, -78], rim, 2.2);
+  c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 0.8; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-488 + i * 4.4, -78); c.lineTo(-486 + i * 3.4, -66); c.stroke(); }
+}
 const court = (c, k) => {
   B(c, -512, -3, 222, 5, 2, k.PT('#EDA765'), 1.2); ln(c, [-400, -3, -400, 2], '#fff', 1.5); ln(c, [-470, -1, -330, -1], 'rgba(255,255,255,.7)', 1);
   ln(c, [-502, 0, -502, -96], '#8a9aa2', 3.4); ln(c, [-502, -90, -490, -90], '#8a9aa2', 2.6);
-  B(c, -494, -104, 5, 30, 1, k.PT('#fff'), 1.3); ln(c, [-489, -78, -474, -78], k.PT('#E8604C'), 2.2);
-  c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 0.8; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-488 + i * 4.4, -78); c.lineTo(-486 + i * 3.4, -66); c.stroke(); }
+  B(c, -494, -104, 5, 30, 1, k.PT('#fff'), 1.3); hoopFront(c, k.PT('#E8604C'));
   ln(c, [-294, 0, -294, -104], '#8a9aa2', 2.6); lamp(c, -300, -100, k.on);
 };
 const tennis = (c, k) => {
@@ -165,6 +169,8 @@ export function drawPins(c, S, t) {
   if (bowler && k < 1.6) { const x = bowler.x + 22 + Math.min(1, k / 1.5) * (512 - bowler.x - 22); c.save(); c.translate(x, FH - 14); c.rotate(k * 9); dot(c, 0, 0, 5.5, '#3D4270', 1.2); dot(c, 1.5, -1.5, 1, '#fff', 0); c.restore(); }
 }
 export function drawBallGames(c, S, t) {
+  const ball = S.done.court && S.objects.find((o) => o.type === 'basketball');
+  if (ball && ball.through && !ball.held && !ball.heldBy) hoopFront(c, '#E8604C'); // the ball is dropping through: rim and net in front of it
   const playing = (flag) => S.baos.filter((b) => { const st = b.plan && b.plan[b.si]; return st && st[flag] && st.begun; });
   const pl = playing('rally');
   if (pl.length) { const a = pl[0].x, b2 = pl.length > 1 ? pl[1].x : -675, u = (Math.sin(t * 2.6) + 1) / 2, x = a + (b2 - a) * u + (a < b2 ? 16 : -16) * (1 - 2 * u); dot(c, x, -22 - Math.sin(u * Math.PI) * (pl.length > 1 ? 34 : 14), 2.6, '#D8F26B', 0.8); }

@@ -928,7 +928,7 @@ function reactTo(S, o) {
 }
 
 // ---------- the basketball: it lives with the court and never goes away ----------
-const COURT = { lo: -512, hi: -290, rest: -440, hx: -481, rim: 80 }, BALL_R = 6.5;
+const COURT = { lo: -512, hi: -290, rest: -440, hx: -481.5, rim: 80, board: -489 }, BALL_R = 6.5;
 const theBall = (S) => S.objects.find((o) => o.type === 'basketball');
 const onCourt = (o) => !!o && o.floor === 0 && !o.held && !o.heldBy && !o.falling && o.x >= COURT.lo && o.x <= COURT.hi;
 const shooting = (b) => { const st = curStep(b); return !!(st && st.shoot && st.begun); };
@@ -938,16 +938,23 @@ function ensureBall(S) {
 }
 // Everyone at the hoop takes turns with the one ball: a shot, down through the net, and a bounce over to the next player.
 function shootTick(S, b) {
-  const o = theBall(S); if (!onCourt(o)) { b.st = 1e9; return; }
+  const o = theBall(S); if (!onCourt(o)) { if (o) o.through = false; b.st = 1e9; return; }
   const players = S.baos.filter(shooting).sort((p, q) => (p.id < q.id ? -1 : 1)), n = players.length, me = players.indexOf(b);
   const T = 1900, k = Math.floor(clock.t / T), u = (clock.t % T) / T;
   if (me < 0 || me !== k % n) { b.pose = 'idle'; return; } // waiting for a turn
   b.pose = u < 0.25 ? 'jump' : 'idle';
-  const sx = b.x - 14, nx = players[(me + 1) % n].x - 14; let x, h;
-  if (u < 0.55) { const v = u / 0.55; x = sx + (COURT.hx - sx) * v; h = BALL_R + (COURT.rim - BALL_R) * v + Math.sin(v * Math.PI) * 60; }
-  else if (u < 0.72) { const v = (u - 0.55) / 0.17; x = COURT.hx - v * 4; h = COURT.rim - (COURT.rim - BALL_R) * v * v; }
-  else { const v = (u - 0.72) / 0.28; x = COURT.hx - 4 + (nx - COURT.hx + 4) * v; h = BALL_R + Math.abs(Math.sin(v * Math.PI * 2)) * 18 * (1 - v); }
-  o.x = x; o.alt = Math.max(0, h - BALL_R); o.floor = 0;
+  // three shots in four go in; the rest clank off the front of the rim or the backboard
+  const roll = seeded(k)(), make = roll < 0.75, board = roll >= 0.875;
+  const sx = b.x - 14, nx = players[(me + 1) % n].x - 14;
+  const tx = make ? COURT.hx : board ? COURT.board + BALL_R : COURT.hx + 8, th = make ? COURT.rim : board ? COURT.rim + 18 : COURT.rim + 5;
+  const out = make ? COURT.hx - 4 : tx + (board ? 30 : 46), until = make ? 0.72 : 0.8; let x, h;
+  if (u < 0.55) { const v = u / 0.55; x = sx + (tx - sx) * v; h = BALL_R + (th - BALL_R) * v + Math.sin(v * Math.PI) * 60; }
+  else if (u < until) { const v = (u - 0.55) / (until - 0.55);
+    if (make) { x = COURT.hx - v * 4; h = th - (th - BALL_R) * v * v; } // down through the net
+    else { x = tx + (out - tx) * v; h = th + (BALL_R - th) * v + Math.sin(v * Math.PI) * (board ? 10 : 24); } // bounced off, back to the ground
+    if (o.shot !== k) { o.shot = k; if (!make) sfx('tick'); } }
+  else { const v = (u - until) / (1 - until); x = out + (nx - out) * v; h = BALL_R + Math.abs(Math.sin(v * Math.PI * 2)) * 18 * (1 - v); }
+  o.x = x; o.alt = Math.max(0, h - BALL_R); o.floor = 0; o.through = make && u >= 0.5 && u < until;
 }
 // The visitor moved the ball: two baos come out to play, whatever the time or weather. At night someone may get woken up for it.
 function callToCourt(S, o) {
@@ -1208,7 +1215,7 @@ function tickWorld(S, dt) {
   for (const o of S.objects) {
     if (o.sq) o.sq *= Math.pow(0.003, dt);
     if (o.type === 'balloon' && !o.held && !o.heldBy) { const top = o.floor >= nFloors(S) || roomAt(S, o.x, o.floor) == null ? 150 : 78; o.falling = false; o.alt += ((top + Math.sin(clock.t / 700 + o.x) * 4) - o.alt) * Math.min(1, dt * 2); if (o.unseen && !o.told) { o.told = true; sfx('land'); reactTo(S, o); startleNear(S, o.x, o.floor, 230); } continue; }
-    if (o.type === 'basketball' && o.alt > 0 && !o.falling && !o.held && !o.heldBy && !S.baos.some(shooting)) { o.falling = true; o.vy = 0; }
+    if (o.type === 'basketball' && o.alt > 0 && !o.falling && !o.held && !o.heldBy && !S.baos.some(shooting)) { o.falling = true; o.vy = 0; o.through = false; }
     if (o.falling) { o.vy -= 1500 * dt; o.alt += o.vy * dt; if (o.alt <= 0) { o.alt = 0; o.falling = false; o.vy = 0; landedThing(S, o); } }
   }
   // needs
