@@ -217,3 +217,57 @@ export function log(S, type, d = {}, opt = {}) {
   if (opt.t != null) S.diary.sort((a, b) => a.t - b.t);
   return e;
 }
+
+// ---------- photos: one entry a day that grows, so a run of snaps reads as one little story ----------
+const PHOTO_KINDS = ['photo_one', 'photo_two', 'photo_none', 'photos'];
+const NUMW = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const MANY = {
+  2: ['Two flashes {room} today, one right after the other. {who} {were} in both pictures. They hang side by side on the wall now.',
+      'Flash, and then flash again {room}. {who} blinked twice. Two new pictures went up on the wall.'],
+  3: ['Three flashes today! {who} kept turning up in the pictures. The living-room wall is filling up.',
+      'Flash, flash, flash: three new pictures, and {who} in most of them.'],
+  many: ['{N} flashes today. {who} {have} started striking a pose whenever a light goes off. The living-room wall is mostly pictures now.',
+         'It was a very flashy day: {n} new pictures. {who} {were} in a lot of them, mostly blinking.'],
+  none: ['{N} flashes today, and nobody in any of the pictures. Just the rooms, very still. We have hung them up anyway.'],
+};
+function listNames(S, names) {
+  const me = S.baos.find((b) => b.id === S.diarist), others = [...new Set(names)].filter((n) => !me || n !== me.name);
+  const list = me && names.includes(me.name) ? [...others, 'I'] : others;
+  if (!list.length) return null;
+  return { text: list.length === 1 ? list[0] : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1], one: list.length === 1 && list[0] !== 'I', me: list.length === 1 && list[0] === 'I' };
+}
+function photosText(S, e) {
+  const who = listNames(S, e.who || []), n = e.n, seed = [...e.d].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const set = !who ? MANY.none : n === 2 ? MANY[2] : n === 3 ? MANY[3] : MANY.many, tpl = set[seed % set.length];
+  const room = e.rooms && e.rooms.length === 1 ? e.rooms[0] : 'around the house';
+  return tpl.replace('{room}', room).replace('{N}', (NUMW[n] || String(n)).replace(/^./, (c) => c.toUpperCase())).replace('{n}', NUMW[n] || String(n))
+    .replace('{who}', who ? who.text : '').replace('{were}', who && (who.one || who.me) ? 'was' : 'were').replace('{have}', who && who.one ? 'has' : 'have');
+}
+export function logPhoto(S, inShot, room) {
+  const day = dayKey(clock.t), names = inShot.map((b) => b.name);
+  const prev = S.diary.slice().reverse().find((e) => e.d === day && PHOTO_KINDS.includes(e.k));
+  if (!prev) {
+    const e = log(S, inShot.length > 1 ? 'photo_two' : inShot.length ? 'photo_one' : 'photo_none', { a: inShot[0] || null, b: inShot[1] || null, room }, { important: true });
+    if (e) { e.who = names; e.rooms = [room]; e.n = 1; }
+    return e;
+  }
+  prev.n = (prev.n || 1) + 1; prev.who = [...new Set([...(prev.who || []), ...names])]; prev.rooms = [...new Set([...(prev.rooms || []), room])];
+  prev.k = 'photos'; prev.text = photosText(S, prev);
+  return prev;
+}
+// Tidy older diaries: several photo entries on one day become one; exact repeats on a day go.
+export function compactDiary(S) {
+  const names = [...new Set([...(S.everNames || []), ...S.baos.map((b) => b.name)])], keep = [], seenText = new Set(), firstPhoto = {};
+  for (const e of S.diary) {
+    if (PHOTO_KINDS.includes(e.k)) { // every photo counts, even when two old entries happen to read the same
+      const found = names.filter((n) => new RegExp('(^|[^\\p{L}])' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}])', 'u').test(e.text));
+      const f = firstPhoto[e.d];
+      if (!f) { firstPhoto[e.d] = e; e.who = e.who || found; e.rooms = e.rooms || []; e.n = e.n || 1; keep.push(e); continue; }
+      f.n = (f.n || 1) + (e.n || 1); f.who = [...new Set([...(f.who || []), ...(e.who || found)])]; f.rooms = [...new Set([...(f.rooms || []), ...(e.rooms || [])])]; f.k = 'photos'; f.text = photosText(S, f);
+      continue;
+    }
+    const key = e.d + '|' + e.text; if (seenText.has(key)) continue; seenText.add(key);
+    keep.push(e);
+  }
+  S.diary.length = 0; S.diary.push(...keep);
+}

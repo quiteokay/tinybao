@@ -3,7 +3,7 @@
 import { RW, FH, COLS, W, ROOMW, OUT, BAO, clamp, rand, randInt, pick, chance, uid, clock, isNight, darkness, dayKey, hourOf, seeded, hashStr } from './core.js';
 import { ROOMS, PAINTS, PROJ, ORDER, BLURB, TREE_SLOTS, buildFixtures, links, nextAdded, minFloor, ext, roofFloor, nFloors, xBounds, roomAt, roomName, whereIs, roomsOf, roomSpot, bedCount, adults, babyOf,
   nextNewcomer, addNewcomer, addFloor, canGrow, weatherAt, addMark, wallSpot } from './world.js';
-import { log, THINGS } from './diary.js';
+import { log, logPhoto, compactDiary, THINGS } from './diary.js';
 
 export const R = { S: null, fx: [], parts: [], flash: 0, onChange: null, sfx: null, drag: null };
 const sfx = (name) => { if (R.sfx) R.sfx(name); };
@@ -62,6 +62,7 @@ export function init(S) {
   if (!S.queue) S.queue = ORDER.slice(S.projIdx || 0); // saves from before the choice: carry on from where the list had got to
   if (S.build) { S.proj = { id: 'floor', p: S.build.p * 0.59 }; delete S.build; } // saves from the first version
   R.fx = buildFixtures(S);
+  compactDiary(S);
   if (S.tray && !S.tray.bao) S.tray.bao = { used: false };
   if (!S.proj) startNext(S, true);
   S.baos.forEach(initBao);
@@ -957,8 +958,8 @@ function burstTreats(S, o) {
 // The visitor took a photo: note who was in it.
 export function notePhoto(x, f, auto) {
   const S = R.S, inShot = S.baos.filter((b) => b.floor === f && Math.abs(b.x - x) < 110 && b.kind !== 'baby');
-  const a = inShot[0] || null, b = inShot[1] || null;
-  log(S, auto ? 'photo_party' : inShot.length > 1 ? 'photo_two' : inShot.length ? 'photo_one' : 'photo_none', { a, b, room: whereIs(S, x, f) }, { important: true });
+  if (auto) log(S, 'photo_party', { a: inShot[0] || null, room: whereIs(S, x, f) }, { important: true });
+  else logPhoto(S, inShot, whereIs(S, x, f)); // one entry a day, rewritten as more photos are taken
   for (const q of inShot) { q.blink = 0.4; say(q, 'star', 1.5); }
 }
 
@@ -1071,7 +1072,7 @@ function startNext(S, live, t) {
 export function plansInfo() {
   const S = R.S, P = S.proj; if (!P) return null;
   const d = PROJ[P.id], left = (1 - P.p) * d.hours, h = clock.hour(), todayLeft = h < 6.5 ? 16 : h < 22.5 ? 22.5 - h : 0;
-  let eta; if (left <= todayLeft) eta = 'done today'; else { const days = Math.ceil((left - todayLeft) / 16); eta = days <= 1 ? 'done tomorrow' : `about ${days} days to go`; }
+  let eta; if (left <= todayLeft) eta = 'on track to finish today'; else { const days = Math.ceil((left - todayLeft) / 16); eta = days <= 1 ? 'on track to finish tomorrow' : `about ${days} days to go`; }
   const p = P.p, stage = P.id === 'floor' ? (p < 0.6 ? 'putting up the frame' : p < 0.9 ? 'painting the new rooms' : 'wiring up the lights')
     : ['tree', 'flowers'].includes(P.id) ? 'planting' : P.id === 'repaint' ? 'painting the ' + P.room : P.id === 'lake' ? (p < 0.85 ? 'digging' : 'filling it with water')
     : p < 0.35 ? (['court', 'tennis', 'bowling'].includes(P.id) ? 'digging' : 'marking it out') : p < 0.7 ? 'building' : p < 0.9 ? 'painting' : 'finishing touches';

@@ -339,10 +339,10 @@ function updatePlansChip(force) {
 }
 function renderPlans() {
   const I = plansInfo(); if (!I) return closePlans();
-  let h = `<h2>What the baos are building</h2><div class="now"><b>${esc(cap(I.name))}</b><span>${esc(cap(I.stage))}</span><div class="bar"><i style="width:${Math.round(I.p * 100)}%"></i></div><small>${Math.round(I.p * 100)}% · ${esc(I.eta)}</small></div>`;
+  let h = `<h2>What the baos are building</h2><div class="now"><b>${esc(cap(I.name))}</b><span>${esc(cap(I.stage))}</span><div class="bar"><i style="width:${Math.round(I.p * 100)}%"></i></div><small>${esc(cap(I.eta))}</small></div>`;
   if (I.choice) {
-    h += `<h3>${I.choice.pick ? 'Next up' : 'Next, they can’t decide between'}</h3><div class="opts">${I.choice.opts.map((o) => `<button data-id="${o.id}" class="${o.id === I.choice.pick ? 'on' : ''}">${esc(cap(o.name))}<small>${esc(o.blurb)}</small></button>`).join('')}</div>`;
-    h += `<p class="note">${I.choice.pick ? `${esc(cap(I.choice.opts.find((o) => o.id === I.choice.pick).name))} it is. They’ll start once this one is done. You can still change your mind until then.` : 'Tap one to choose. If nobody chooses by tomorrow morning, the baos will pick for themselves.'}</p>`;
+    h += `<h3>${I.choice.pick ? 'Next up' : 'Inspire their next addendum to be…'}</h3><div class="opts">${I.choice.opts.map((o) => `<button data-id="${o.id}" class="${o.id === I.choice.pick ? 'on' : ''}">${esc(cap(o.name))}<small>${esc(o.blurb)}</small></button>`).join('')}</div>`;
+    h += `<p class="note">${I.choice.pick ? `${esc(cap(I.choice.opts.find((o) => o.id === I.choice.pick).name))} it is. They’ll start once this one is done. You can still change your mind until then.` : 'Tap one to choose.'}</p>`;
   } else h += `<p class="note">${I.more ? 'The next two ideas go up on the board when this one is a bit further along.' : 'The big list is done. Now it’s trees, flowers and odd jobs, for ever.'}</p>`;
   h += '<div class="cardBtns"><button id="pcOk">ok</button></div>';
   $('pcBody').innerHTML = h;
