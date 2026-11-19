@@ -22,6 +22,9 @@ export const THINGS = {
   telescope: { name: 'a telescope', home: ['roof'] },
   seeds:     { name: 'a packet of seeds' },
   paint:     { name: 'a pot of paint' },
+  party:     { name: 'a party popper' },
+  treats:    { name: 'a bag of treats' },
+  treat:     { name: 'a treat' },
 };
 
 const THEORIES = [
@@ -55,6 +58,16 @@ const T = {
     'The light was on very late. It was {a}, pottering.'],
   hand_arrival: ['There is a new bao called {a}. {a} just sort of landed {room}.', '{a} turned up {room}, a bit dizzy. We have found a blanket.', 'We have a {a} now. Nobody saw {a} come in; {a} was simply {room}.',
     'A newcomer: {a}, found {room}, blinking. {a} seems nice.', '{a} arrived today, from above, more or less. {a} landed {room} and asked what was for supper.'],
+  party: ['A party popper went off {room} all by itself, and that was it: a party. Everyone danced. {a} danced the longest.', 'There was a bang {room}, then confetti everywhere, then a party. Nobody planned it. Best kind.',
+    'We had a party {room} today. {a} says it started on its own, which is how the good ones start.'],
+  treats: ['A bag of treats burst open {room}. Sweets everywhere! {a} got there first.', 'It rained treats {room}, more or less. We collected every single one.', 'A paper bag popped {room} and sweets went all over the floor. Nobody complained.'],
+  treats_gone: ['{a} found the very last treat and ate it slowly, so everyone could watch.', 'All the treats are gone. {a} checked under the sofa twice.'],
+  photo_one: ['There was a bright flash {room} and {a} saw spots for a while. Afterwards, a little picture of {a} turned up on the wall.', 'A flash {room}! {a} blinked. There is a new photo on the wall now, and {a} looks lovely in it.'],
+  photo_two: ['A flash went off {room}, right while {a} and {b} were there. There is a picture of the two of them on the wall now.', '{a} and {b} got their picture taken {room}. Nobody is sure by whom.'],
+  photo_none: ['Something flashed {room}. Nobody was there. There is a picture of it on the wall now, which is a bit odd.'],
+  photo_party: ['Somebody got a picture of the party. It is on the wall now. {a} is mid-twirl.', 'The party photo came out well. {a} has a streamer on one ear.'],
+  welcome: ['{a} gave {b} a big welcome hug.', '{a} was the first to say hello to {b}.', '{a} showed {b} where the snacks are kept, which counts as a welcome here.'],
+  teddy_give: ['{a} gave the teddy to {baby}. {baby} has not let go since.', '{a} found a teddy and took it straight to {baby}.'],
   baby_feed: ['{a} gave {baby} a bottle.', '{baby} drank a whole bottle and burped like a much bigger bao.'],
   laundry: ['{a} put a wash on.', '{a} did the laundry. One sock is missing, as usual.'],
   hang: ['{a} hung the washing out on the line.', 'Washing on the line. {a} pegged everything very neatly.'],

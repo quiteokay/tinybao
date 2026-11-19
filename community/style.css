@@ -12,7 +12,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .round:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(58,42,34,.25); }
 .round svg { width: 26px; height: 26px; fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .right { display: flex; gap: 8px; }
-#bZap.on { background: #FFB4A2; animation: pulse 1s infinite; }
+#bCam.on { background: #BFE6F5; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { box-shadow: 0 3px 0 rgba(58,42,34,.25), 0 0 0 6px rgba(255,120,90,.35); } }
 
 #tray { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -41,18 +41,36 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 
 #diary { position: fixed; inset: 0; z-index: 40; background: rgba(40,30,50,.35); display: grid; place-items: end center; }
 #diary[hidden], #card[hidden], #tag[hidden], #hint[hidden] { display: none; }
-.book { width: min(520px, 100vw); max-height: min(82vh, 760px); background: var(--paper); border: 2px solid var(--ink); border-bottom: none; border-radius: 24px 24px 0 0; display: flex; flex-direction: column;
-  animation: up .28s ease-out; background-image: repeating-linear-gradient(transparent 0 27px, rgba(111,168,220,.22) 27px 28px); }
-@media (min-width: 700px) { #diary { place-items: center; } .book { border-bottom: 2px solid var(--ink); border-radius: 24px; } }
+.book { width: auto; max-width: 100vw; background: #FBF1DC; border: 2px solid var(--ink); border-bottom: none; border-radius: 22px 22px 0 0; display: flex; flex-direction: column; animation: up .28s ease-out; }
+@media (min-width: 700px) { #diary { place-items: center; } .book { border-bottom: 2px solid var(--ink); border-radius: 22px; } }
 @keyframes up { from { transform: translateY(40px); opacity: 0; } }
-.bookHead { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px 8px; }
-.bookHead h2 { font-size: 19px; }
-.bookHead button { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; }
-#diaryList { overflow-y: auto; padding: 0 18px 12px; -webkit-overflow-scrolling: touch; flex: 1; }
-#diaryList h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #B5654A; margin: 14px 0 2px; line-height: 28px; }
-#diaryList p { font-size: 15px; line-height: 28px; }
-#diaryList .empty { opacity: .6; font-style: italic; }
-.bookFoot { border-top: 2px dashed rgba(58,42,34,.25); padding: 9px 18px calc(10px + env(safe-area-inset-bottom)); font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; background: var(--paper); border-radius: 0 0 22px 22px; }
+.bookHead { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px 8px; }
+.bookHead h2 { font-size: 19px; flex: 1; }
+#bookNav { font-size: 12px; font-weight: 700; opacity: .55; }
+.bookHead button { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; border: 2px solid var(--ink); background: #fff; font-weight: 700; }
+#bookPages { position: relative; margin: 0 auto; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+#bookPages .layer { position: absolute; inset: 0; overflow: hidden; }
+.page { position: absolute; top: 0; padding: 12px 20px 30px; overflow: hidden; background-color: var(--paper);
+  background-image: repeating-linear-gradient(transparent 0 29px, rgba(111,168,220,.22) 29px 30px); background-position: 0 12px; }
+.page.measure { position: absolute; visibility: hidden; left: -9999px; }
+.page.pg-left { box-shadow: inset -14px 0 14px -12px rgba(90,60,30,.35); }
+.page.pg-right { box-shadow: inset 14px 0 14px -12px rgba(90,60,30,.35); }
+.page.back { transform-origin: 0 0; background-color: #FDF4E1; }
+.page.blank { background-image: none; background-color: #F6EBD3; }
+.backwrap { position: absolute; inset: 0; filter: drop-shadow(0 0 6px rgba(60,40,20,.35)); pointer-events: none; }
+.page .shade { position: absolute; inset: 0; pointer-events: none; }
+.page h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #B5654A; margin: 0; line-height: 30px; }
+.page p { font-size: 16px; line-height: 30px; margin: 0; }
+.page p.empty { opacity: .6; font-style: italic; }
+.page .pno { position: absolute; bottom: 7px; left: 0; right: 0; text-align: center; font-size: 11px; opacity: .45; }
+.nm { font-weight: 800; }
+.nm.live { cursor: pointer; text-decoration: underline dotted 1.5px; text-underline-offset: 3px; }
+.photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 6px; }
+.photos figure { background: #fff; padding: 6px 6px 4px; border: 1.5px solid rgba(58,42,34,.35); box-shadow: 0 2px 4px rgba(0,0,0,.12); transform: rotate(-1.2deg); }
+.photos figure:nth-child(even) { transform: rotate(1.4deg); }
+.photos img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; }
+.photos figcaption { font-size: 11px; text-align: center; padding-top: 3px; opacity: .7; }
+.bookFoot { border-top: 2px dashed rgba(58,42,34,.25); padding: 9px 16px calc(10px + env(safe-area-inset-bottom)); font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; }
 .bookFoot a { color: #B5654A; font-weight: 700; }
 #home { position: fixed; left: 12px; top: max(10px, env(safe-area-inset-top)); z-index: 3; font-size: 12px; font-weight: 800; color: #fff; text-decoration: none; text-shadow: 0 1px 2px rgba(40,30,20,.5); opacity: .85; }
 
@@ -63,3 +81,6 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .slot.bao.used { background: transparent; }
 #slots .sep { width: 2px; align-self: stretch; margin: 6px 0; background: rgba(58,42,34,.18); border-radius: 2px; }
 @media (max-width: 430px) { #slots { gap: 5px; padding: 5px 6px; } .slot { width: 49px; height: 49px; border-radius: 13px; } .slot canvas { transform: scale(.9); } }
+#bMusic { position: fixed; z-index: 4; right: 60px; top: max(12px, env(safe-area-inset-top)); width: 40px; height: 40px; }
+#bMusic svg { width: 22px; height: 22px; }
+#bMusic.on { background: #FFE08A; }

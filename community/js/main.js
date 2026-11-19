@@ -2,13 +2,15 @@
 import { RW, FH, W, OUT, BAO, clamp, clock, dayKey, hourOf } from './core.js';
 import { newState, nFloors, weatherAt, adults, ext, minFloor, nextAdded } from './world.js';
 import { drawBaoShape } from './drawbao.js';
-import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, vaporize, ensureTray, initBao, dropBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
+import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
+import * as music from './music.js';
+import { openBook, closeBook, bookOpen, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
 import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 4; // keep in step with version.json
+const VERSION = 5; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const Q = new URLSearchParams(location.search);
 const TEST = ['speed', 'skipDays', 'hour', 'fresh', 'test'].some((k) => Q.has(k));
@@ -23,7 +25,7 @@ function serialize() {
   out.baos = S.baos.map((b) => ({ id: b.id, name: b.name, kind: b.kind, flavor: b.flavor, acc: b.acc, trait: b.trait, from: b.from, arrived: b.arrived,
     x: Math.round(b.x), floor: b.held || b.fall ? 0 : b.floor, needs: b.needs }));
   out.objects = S.objects.map((o) => { let x = o.x, floor = o.held ? 0 : o.floor; if (o.heldBy) { const c = S.baos.find((b) => b.id === o.heldBy); if (c) { x = c.x; floor = c.floor; } }
-    return { id: o.id, type: o.type, x: Math.round(x), floor, uses: o.uses, water: o.water, t: o.t, unseen: o.unseen }; });
+    return { id: o.id, type: o.type, x: Math.round(x), floor, uses: o.uses, water: o.water, t: o.t, unseen: o.unseen, hue: o.hue }; });
   return JSON.stringify(out);
 }
 function save() { try { localStorage.setItem(KEY, serialize()); } catch (e) { /* private mode or full: carry on without saving */ } }
@@ -102,22 +104,21 @@ function hit(sx, sy) {
   const f = furnAt(p.x, p.h); if (f) return { furn: f };
   return null;
 }
-const ptrs = new Map(); let down = null, pinch = null, armed = -1, zapOn = false, tagFor = null, tagUntil = 0;
+const ptrs = new Map(); let down = null, pinch = null, armed = -1, camOn = false, tagFor = null, tagUntil = 0;
 function showTag(b) { tagFor = b; tagUntil = performance.now() + 4500; }
 function setHint(text) { const h = $('hint'); if (text) { h.textContent = text; h.hidden = false; } else h.hidden = true; }
-function setZap(on) { zapOn = on; $('bZap').classList.toggle('on', on); setHint(on ? 'press and hold a bao to vaporize it · tap ⚡ to cancel' : armed >= 0 ? 'tap anywhere to drop it' : ''); }
-function setArmed(i) { armed = i; if (i >= 0 && zapOn) setZap(false); drawTray(); setHint(i === BAO_SLOT ? 'tap anywhere to drop the new bao in' : i >= 0 ? 'tap anywhere to drop it' : ''); }
+function setCam(on) { camOn = on; $('bCam').classList.toggle('on', on); setHint(on ? 'tap anywhere to take a photo' : armed >= 0 ? 'tap anywhere to drop it' : ''); }
+function setArmed(i) { armed = i; if (i >= 0 && camOn) setCam(false); drawTray(); setHint(i === BAO_SLOT ? 'tap anywhere to drop the new bao in' : i >= 0 ? 'tap anywhere to drop it' : ''); }
 
 canvas.addEventListener('pointerdown', (e) => {
-  snd.unlock();
+  snd.unlock(); music.resumeIfOn();
   canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 2) {
-    if (down && down.mode === 'furn') dropFurn(); if (down && down.mode === 'bao') releaseBao(down.t.bao); if (down && down.mode === 'thing') releaseThing(down.t.thing); if (down && down.t && down.t.bao) { down.t.bao.vapor = 0; down.t.bao.frozen = false; }
+    if (down && down.mode === 'furn') dropFurn(); if (down && down.mode === 'bao') releaseBao(down.t.bao); if (down && down.mode === 'thing') releaseThing(down.t.thing);
     down = null; stopFollow(); const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return;
   }
   const t = hit(e.clientX, e.clientY);
   down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t, moved: false, mode: null, id: e.pointerId, at: performance.now() };
-  if (zapOn && t && t.bao) { down.mode = 'zap'; t.bao.vapor = 0.001; t.bao.frozen = true; snd.play('charge'); }
 });
 canvas.addEventListener('pointermove', (e) => {
   if (!ptrs.has(e.pointerId)) { canvas.style.cursor = hit(e.clientX, e.clientY) ? 'grab' : 'default'; return; }
@@ -125,7 +126,6 @@ canvas.addEventListener('pointermove', (e) => {
   if (pinch && ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinch.d); pinch.d = d; return; }
   if (!down || down.id !== e.pointerId) return;
   const dist = Math.hypot(e.clientX - down.x, e.clientY - down.y);
-  if (down.mode === 'zap') return; // the bao holds still, so a wobbly finger does not cancel it
   if (down.mode === 'furn') { const p = toWorld(e.clientX, e.clientY); moveFurn(p.x, p.h - 12); down.moved = true; return; }
   if (!down.moved && dist > 8) {
     down.moved = true;
@@ -146,16 +146,16 @@ function pointerEnd(e) {
   if (d.mode === 'furn') { if (!dropFurn()) snd.play('blip'); setHint(''); save(); }
   else if (d.mode === 'bao') { releaseBao(d.t.bao); save(); }
   else if (d.mode === 'thing') { releaseThing(d.t.thing); save(); }
-  else if (d.mode === 'zap') { d.t.bao.vapor = 0; d.t.bao.frozen = false; }
   else if (!d.moved && e.type === 'pointerup') {
-    if (armed >= 0) { const p = toWorld(e.clientX, e.clientY); useTray(armed, p.x, p.h); }
+    if (camOn) { const p = toWorld(e.clientX, e.clientY); takePhoto(p.x, p.h, false); setCam(false); }
+    else if (armed >= 0) { const p = toWorld(e.clientX, e.clientY); useTray(armed, p.x, p.h); }
     else if (d.t && d.t.bao) {
       const now = performance.now(), b = d.t.bao;
       petBao(b); snd.play('pet'); showTag(b);
       if (lastTap.b === b && now - lastTap.t < 400) { startFollow(b); snd.play('blip'); lastTap = { t: 0, b: null }; } else lastTap = { t: now, b };
     }
     else if (d.t && d.t.thing) { d.t.thing.sq = 0.3; snd.play('blip'); }
-    else if (d.t && d.t.furn && armed < 0) { setHint('press and hold to move it'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (!zapOn && armed < 0 && !(down && down.mode === 'furn')) setHint(''); }, 1500); }
+    else if (d.t && d.t.furn && armed < 0) { setHint('press and hold to move it'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (!camOn && armed < 0 && !(down && down.mode === 'furn')) setHint(''); }, 1500); }
     else { const now = performance.now(); tagFor = null; if (lastTap.b === 'sky' && now - lastTap.t < 400) { follow = null; goHome = true; lastTap = { t: 0, b: null }; } else lastTap = { t: now, b: 'sky' }; }
   }
 }
@@ -167,7 +167,8 @@ canvas.addEventListener('wheel', (e) => {
   else { V.cy -= e.deltaY / V.s; V.cx += e.deltaX / V.s; clampCam(); }
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { $('diary').hidden = true; setArmed(-1); setZap(false); }
+  if (!$('diary').hidden) { if (e.key === 'Escape') closeDiary(); else if (e.key === 'ArrowRight') turnPage(1); else if (e.key === 'ArrowLeft') turnPage(-1); return; }
+  if (e.key === 'Escape') { setArmed(-1); setCam(false); }
   const k = { ArrowUp: [0, 60], ArrowDown: [0, -60], ArrowLeft: [-60, 0], ArrowRight: [60, 0] }[e.key];
   if (k) { stopFollow(); V.cx += k[0] / V.s; V.cy += k[1] / V.s; clampCam(); }
   if (e.key === '+' || e.key === '=') zoomAt(V.vw / 2, V.vh / 2, 1.15); if (e.key === '-') zoomAt(V.vw / 2, V.vh / 2, 1 / 1.15);
@@ -234,7 +235,26 @@ function trayDown(e, i, el) {
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 }
 
-$('bZap').addEventListener('click', () => { snd.unlock(); snd.play('tick'); setArmed(-1); setZap(!zapOn); });
+$('bCam').addEventListener('click', () => { snd.unlock(); snd.play('tick'); setArmed(-1); setCam(!camOn); });
+// A photo is a fresh little render of the scene around a point, so it comes out the same wherever the view is.
+const PW = 240, PH = 180, photoCanvas = document.createElement('canvas');
+function takePhoto(x, h, auto) {
+  const f = Math.max(Math.floor((h + 6) / FH), S.basement ? -1 : 0), centreH = Math.min(h, f * FH + 70), s = 1.55;
+  const Vp = { vw: PW, vh: PH, dpr: 1, s, cx: x, cy: centreH, gy: PH / 2, wx0: x - PW / 2 / s, wx1: x + PW / 2 / s };
+  photoCanvas.width = PW; photoCanvas.height = PH;
+  const flash = R.flash; R.flash = 0; render(photoCanvas.getContext('2d'), Vp, S, performance.now() / 1000); R.flash = flash;
+  const pc = photoCanvas.getContext('2d'); pc.setTransform(1, 0, 0, 1, 0, 0);
+  const g = pc.createRadialGradient(PW / 2, PH / 2, PH * 0.45, PW / 2, PH / 2, PW * 0.7); g.addColorStop(0, 'rgba(255,240,210,0)'); g.addColorStop(1, 'rgba(120,80,40,.28)'); pc.fillStyle = g; pc.fillRect(0, 0, PW, PH);
+  let d; try { d = photoCanvas.toDataURL('image/jpeg', 0.72); } catch (e) { return; }
+  (S.photos = S.photos || []).push({ id: 'p' + Date.now().toString(36), t: clock.t, day: dayKey(clock.t), d });
+  if (S.photos.length > 24) S.photos.splice(0, S.photos.length - 24);
+  if (!auto) { R.flash = 1; snd.play('shutter'); }
+  notePhoto(x, clamp(f, S.basement ? -1 : 0, nFloors(S)), auto); save();
+}
+// ---------- music ----------
+function drawMusicBtn() { const on = music.isOn(); $('bMusic').innerHTML = `<svg viewBox="0 0 24 24"><path d="M9 17V6l10-2v11" fill="none"/><circle cx="6.5" cy="17.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/><circle cx="16.5" cy="15.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/>${on ? '' : '<path d="M4 4l16 16" stroke="#E8604C"/>'}</svg>`;
+  $('bMusic').classList.toggle('on', on); $('bMusic').title = on ? 'Music is on' : 'Music is off'; $('bMusic').setAttribute('aria-pressed', String(on)); }
+$('bMusic').addEventListener('click', () => { snd.unlock(); music.setOn(!music.isOn()); drawMusicBtn(); });
 function drawSoundBtn() { const m = snd.isMuted(); $('bSound').innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="#FFF3D6"/>${m ? '<path d="M16 9.5l5 5M21 9.5l-5 5"/>' : '<path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'}</svg>`; $('bSound').title = m ? 'Sound is off' : 'Sound is on'; $('bSound').setAttribute('aria-pressed', String(!m)); }
 $('bSound').addEventListener('click', () => { snd.unlock(); snd.setMuted(!snd.isMuted()); drawSoundBtn(); snd.play('pet'); });
 
@@ -248,19 +268,22 @@ function dayLabel(key) {
 function openDiary() {
   const who = S.baos.find((b) => b.id === S.diarist);
   $('diaryTitle').textContent = who ? `${who.name}’s diary` : 'The diary';
-  const list = $('diaryList'); list.innerHTML = '';
-  const days = {}; for (const e of S.diary) (days[e.d] = days[e.d] || []).push(e);
-  const keys = Object.keys(days).sort().reverse();
-  if (!keys.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Nothing written yet.'; list.appendChild(p); }
-  for (const k of keys.slice(0, 45)) {
-    const h = document.createElement('h3'); h.textContent = dayLabel(k); list.appendChild(h);
-    for (const e of days[k]) { const p = document.createElement('p'); p.textContent = e.text; list.appendChild(p); }
-  }
-  $('diary').hidden = false; list.scrollTop = 0; snd.unlock(); snd.play('page');
+  // everyone who might be mentioned: residents in their own colour, old friends in a quiet brown
+  const people = S.baos.map((b) => ({ name: b.name, id: b.id, color: NAME_INK[b.flavor] || '#8a6a4a' }));
+  for (const n of S.everNames || []) if (!people.some((p) => p.name === n)) people.push({ name: n, id: null, color: '#8a7a72' });
+  people.sort((a, b) => b.name.length - a.name.length);
+  $('diary').hidden = false;
+  openBook({ host: $('bookPages'), nav: $('bookNav'), entries: S.diary.slice(-400), photos: S.photos || [], people, dayLabel,
+    onTurn: () => snd.play('page'),
+    onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } } });
+  snd.unlock(); snd.play('page');
 }
+function closeDiary() { $('diary').hidden = true; closeBook(); }
+attachBookInput($('bookPages'));
 $('bDiary').addEventListener('click', openDiary);
-$('diaryClose').addEventListener('click', () => { $('diary').hidden = true; });
-$('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) $('diary').hidden = true; });
+$('diaryClose').addEventListener('click', closeDiary);
+$('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) closeDiary(); });
+window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(); });
 $('exportBtn').addEventListener('click', (e) => { e.preventDefault(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([serialize()], { type: 'application/json' })); a.download = `tinybao-community-${dayKey(clock.t)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
 $('importBtn').addEventListener('click', (e) => { e.preventDefault(); $('importFile').click(); });
 $('importFile').addEventListener('change', async (e) => {
@@ -278,10 +301,10 @@ async function checkForUpdates() {
   const link = $('updateBtn'); link.textContent = 'checking…';
   let info;
   try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw 0; info = await r.json(); }
-  catch (e) { link.textContent = 'check for updates'; $('diary').hidden = true; showCard('Could not check', ['The baos could not reach the outside world just now. Try again when you are online.'], false); return; }
+  catch (e) { link.textContent = 'check for updates'; closeDiary(); showCard('Could not check', ['The baos could not reach the outside world just now. Try again when you are online.'], false); return; }
   if (!(info.v > VERSION)) {
-    link.textContent = 'check for updates'; $('diary').hidden = true;
-    showCard('You already have the latest', ['Nothing new since your last visit. Lately:'].concat(notesSince(info, VERSION - 1).map((n) => '• ' + n)), false); return;
+    link.textContent = 'check for updates'; closeDiary();
+    showCard('You already have the latest', [].concat(notesSince(info, VERSION - 1).map((n) => '• ' + n)), false); return;
   }
   link.textContent = 'fetching…'; save();
   try { localStorage.setItem('tinybao.updatedFrom', String(VERSION)); } catch (e) { /* ignore */ }
@@ -322,8 +345,7 @@ function frame(now) {
   else if (gap > 0) { const n = Math.min(240, Math.ceil(gap / 100)), dt = gap / n / 1000; for (let i = 0; i < n; i++) { clock.t += dt * 1000; tick(dt); } }
   tickParts(real); updateTrayNote(); stepCamera(real);
   // furniture lifts after a short press, so an ordinary drag still pans the view
-  if (down && !down.mode && !down.moved && down.t && down.t.furn && !zapOn && armed < 0 && now - down.at > 380) { down.mode = 'furn'; liftFurn(down.t.furn); snd.play('pick'); setHint('drop it in any room'); canvas.style.cursor = 'grabbing'; }
-  if (down && down.mode === 'zap') { const b = down.t.bao; b.vapor += real / 1.7; if (b.vapor >= 1) { vaporize(b); down = null; setZap(false); save(); } }
+  if (down && !down.mode && !down.moved && down.t && down.t.furn && !camOn && armed < 0 && now - down.at > 380) { down.mode = 'furn'; liftFurn(down.t.furn); snd.play('pick'); setHint('drop it in any room'); canvas.style.cursor = 'grabbing'; }
   render(ctx, V, S, now / 1000);
   const tag = $('tag');
   if (tagFor && now < tagUntil && S.baos.includes(tagFor) && !tagFor.held) {
@@ -341,7 +363,7 @@ function boot() {
   const loaded = load(); S = loaded || newState();
   const first = !loaded;
   if (first) S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
-  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
+  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what, info) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'photo') takePhoto(info.x, info.f * FH + 40, true); if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
   window.addEventListener('resize', resize); resize();
   let from = S.lastSeen || clock.t;
   if (Q.has('skipDays')) from = clock.t - (+Q.get('skipDays') || 1) * 86400000;
@@ -356,11 +378,11 @@ function boot() {
     const star = pool[Math.floor(Math.random() * pool.length)]; S.lastStar = star.id; startFollow(star, true);
   }
   announceUpdate();
-  bootDay = S.tray.day; drawTray(); drawSoundBtn(); save();
+  bootDay = S.tray.day; drawTray(); drawSoundBtn(); drawMusicBtn(); save();
   setInterval(save, 8000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
-  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, VERSION, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
+  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, music, VERSION, takePhoto, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
   requestAnimationFrame(frame);
 }
 boot();

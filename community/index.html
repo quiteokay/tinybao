@@ -9,10 +9,11 @@
   <link rel="apple-touch-icon" href="/lilbao_351.png">
   <link rel="icon" type="image/png" href="/lilbao_351.png">
   <title>tiny bao community</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
+  <button class="round" id="bMusic" aria-label="Music on or off"></button>
   <button class="round" id="bSound" aria-label="Sound on or off"></button>
   <div id="tag" hidden></div>
   <div id="hint" hidden></div>
@@ -32,22 +33,22 @@
       <div id="trayNote">today’s things</div>
     </div>
     <div class="right">
-      <button class="round" id="bZap" title="Vaporize" aria-label="Vaporize a bao">
-        <svg viewBox="0 0 24 24"><path d="M13 2 5 13.5h5.5L9 22l9-12.5h-5.5z" fill="#FFD166"/></svg>
+      <button class="round" id="bCam" title="Camera" aria-label="Take a photo">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="3" fill="#FFF3D6"/><path d="M8.5 7l1.5-2.5h4L15.5 7"/><circle cx="12" cy="13.5" r="3.6" fill="#BFE6F5"/><circle cx="17.6" cy="10" r=".9" fill="#E8604C" stroke="none"/></svg>
       </button>
     </div>
   </div>
 
   <div id="diary" hidden>
     <div class="book">
-      <div class="bookHead"><h2 id="diaryTitle">Diary</h2><button id="diaryClose" aria-label="Close">×</button></div>
-      <div id="diaryList"></div>
+      <div class="bookHead"><h2 id="diaryTitle">Diary</h2><span id="bookNav"></span><button id="diaryClose" aria-label="Close">×</button></div>
+      <div id="bookPages"></div>
       <div class="bookFoot">
-        <span>Your community is saved in this browser only. <a href="#" id="updateBtn">check for updates</a></span>
+        <span>Saved in this browser only. <a href="#" id="updateBtn">check for updates</a></span>
         <span><a href="#" id="exportBtn">keep a copy</a> · <a href="#" id="importBtn">restore a copy</a><input type="file" id="importFile" accept="application/json,.json" hidden></span>
       </div>
     </div>
   </div>
-  <script type="module" src="js/main.js?v=4"></script>
+  <script type="module" src="js/main.js?v=5"></script>
 </body>
 </html>

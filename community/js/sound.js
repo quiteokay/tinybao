@@ -46,6 +46,9 @@ const SOUNDS = {
   charge() { tone(180, 520, 1.6, { type: 'sawtooth', vol: 0.05, attack: 0.3 }); },
   arrive() { [523, 659, 784].forEach((f, i) => tone(f, f, 0.2, { type: 'triangle', vol: 0.2, at: i * 0.13 })); },
   fanfare() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, f, i === 5 ? 0.5 : 0.16, { type: 'triangle', vol: 0.22, at: i * 0.14 })); },
+  party() { noise(0.12, { vol: 0.5, freq: 2200, q: 0.4 }); [784, 988, 1175, 1568, 1175, 1568, 1976].forEach((f, i) => tone(f, f, 0.18, { type: 'triangle', vol: 0.16, at: 0.12 + i * 0.11 }));
+    [392, 494, 587].forEach((f) => tone(f, f, 0.9, { type: 'triangle', vol: 0.08, at: 0.9 })); noise(0.5, { vol: 0.08, freq: 6000, q: 0.3, type: 'highpass', at: 0.15 }); },
+  shutter() { noise(0.03, { vol: 0.45, freq: 3000, q: 0.6 }); noise(0.05, { vol: 0.3, freq: 1600, q: 0.8, at: 0.07 }); tone(1900, 1100, 0.18, { type: 'sawtooth', vol: 0.02, at: 0.1 }); },
   tick() { tone(700, 700, 0.04, { type: 'triangle', vol: 0.1 }); },
   page() { noise(0.16, { vol: 0.08, freq: 3000, sweep: 1500, q: 1 }); },
 };

@@ -155,7 +155,7 @@ export const TH = {
     line(c, [-10, -12, -13, 0], INK, 2.5); line(c, [10, -12, 13, 0], INK, 2.5);
   },
   rug(c) { c.beginPath(); c.ellipse(0, -2, 30, 4.5, 0, 0, 7); c.fillStyle = '#B58BD9'; c.fill(); c.lineWidth = 1.3; c.strokeStyle = INK; c.stroke(); c.beginPath(); c.ellipse(0, -2, 19, 2.6, 0, 0, 7); c.strokeStyle = '#FFD166'; c.stroke(); },
-  lamp(c) { line(c, [0, 0, 0, -44], '#8a7a6a', 2.5); B(c, -7, -3, 14, 3, 1.5, '#8a7a6a', 1); c.beginPath(); c.moveTo(-6, -58); c.lineTo(6, -58); c.lineTo(11, -42); c.lineTo(-11, -42); c.closePath(); c.fillStyle = '#FFE9A8'; c.fill(); c.lineWidth = 1.4; c.strokeStyle = INK; c.stroke(); },
+  lamp(c, o) { line(c, [0, 0, 0, -44], '#8a7a6a', 2.5); B(c, -7, -3, 14, 3, 1.5, '#8a7a6a', 1); c.beginPath(); c.moveTo(-6, -58); c.lineTo(6, -58); c.lineTo(11, -42); c.lineTo(-11, -42); c.closePath(); c.fillStyle = o && o.off ? '#DDD6C8' : '#FFE9A8'; c.fill(); c.lineWidth = 1.4; c.strokeStyle = INK; c.stroke(); },
   duck(c) { c.beginPath(); c.ellipse(0, -6, 10, 6.5, 0, 0, 7); c.fillStyle = '#FFD84D'; c.fill(); c.lineWidth = 1.3; c.strokeStyle = INK; c.stroke(); circ(c, 6, -14, 5.5, '#FFD84D', 1.3); c.beginPath(); c.moveTo(10.5, -14.5); c.lineTo(15.5, -13); c.lineTo(10.5, -11.5); c.closePath(); c.fillStyle = '#F2913D'; c.fill(); c.stroke(); circ(c, 7.5, -15.5, 0.9, INK, 0); },
   wood(c) { for (const [x, y] of [[-6, -5], [6, -5], [0, -13]]) { circ(c, x, y, 5.5, '#C28E5C', 1.3); circ(c, x, y, 2.3, '#E3BE8E', 0); } line(c, [-11, -8, 11, -8], '#E8604C', 1.8); },
   books(c) { [['#6FA8DC', -11, 22, 0], ['#E8604C', -9, 19, 5], ['#7CC96B', -10, 21, 10], ['#FFD166', -8, 17, 15]].forEach(([col, x, w, y]) => B(c, x, -y - 5, w, 5, 1, col, 1.1)); },
@@ -172,6 +172,13 @@ export const TH = {
     const fx = Math.sin(t * 1.2) * 5, d = Math.cos(t * 1.2) > 0 ? 1 : -1; c.fillStyle = '#F2913D'; c.beginPath(); c.ellipse(fx, -13, 3.6, 2.3, 0, 0, 7); c.fill(); c.beginPath(); c.moveTo(fx - d * 3, -13); c.lineTo(fx - d * 7, -16); c.lineTo(fx - d * 7, -10); c.closePath(); c.fill(); },
   telescope(c) { line(c, [0, -22, -9, 0], INK, 2); line(c, [0, -22, 9, 0], INK, 2); line(c, [0, -22, 0, 0], INK, 2); c.save(); c.translate(0, -24); c.rotate(-0.6); B(c, -14, -4, 30, 8, 2, '#6F7FB5'); B(c, 14, -5.5, 6, 11, 1.5, '#FFD166', 1.2); c.restore(); },
   seeds(c) { B(c, -8, -18, 16, 18, 1.5, '#F5F0E8'); B(c, -8, -18, 16, 5, 1.5, '#7CC96B', 1.1); c.fillStyle = '#FF8FB1'; for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(Math.cos(i * 1.257) * 2.6, -7 + Math.sin(i * 1.257) * 2.6, 2, 0, 7); c.fill(); } circ(c, 0, -7, 1.4, '#FFD166', 0); },
+  party(c) { c.save(); c.rotate(-0.35); c.beginPath(); c.moveTo(-6, 0); c.lineTo(6, 0); c.lineTo(2, -24); c.lineTo(-2, -24); c.closePath(); c.fillStyle = '#FF8FB1'; c.fill(); c.lineWidth = 1.3; c.strokeStyle = INK; c.stroke();
+    for (const [y, col] of [[-6, '#FFD166'], [-13, '#7CC6F2'], [-19, '#7CC96B']]) line(c, [-4.5 + (-y) * 0.1, y, 4.5 - (-y) * 0.1, y], col, 2);
+    for (const [dx, col] of [[-5, '#FFD166'], [0, '#7CC6F2'], [5, '#FF8FB1']]) { c.beginPath(); c.moveTo(0, -24); c.quadraticCurveTo(dx * 2, -32, dx * 1.6, -38); c.strokeStyle = col; c.lineWidth = 1.6; c.stroke(); } c.restore(); },
+  treats(c) { c.beginPath(); c.moveTo(-10, 0); c.lineTo(-12, -18); c.quadraticCurveTo(0, -24, 12, -18); c.lineTo(10, 0); c.closePath(); c.fillStyle = '#F6E3C0'; c.fill(); c.lineWidth = 1.4; c.strokeStyle = INK; c.stroke();
+    B(c, -6, -22, 12, 5, 2, '#E8604C', 1.1); for (const [x, y, col] of [[-4, -10, '#FF8FB1'], [3, -7, '#7CC6F2'], [0, -14, '#FFD166']]) circ(c, x, y, 2.2, col, 0.8); },
+  treat(c, o) { const col = `hsl(${o.hue ?? 340} 75% 68%)`; c.save(); c.translate(0, -4); c.beginPath(); c.ellipse(0, 0, 4.2, 3.2, 0, 0, 7); c.fillStyle = col; c.fill(); c.lineWidth = 1; c.strokeStyle = INK; c.stroke();
+    for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 4, 0); c.lineTo(s * 8, -3); c.lineTo(s * 8, 3); c.closePath(); c.fillStyle = col; c.fill(); c.stroke(); } circ(c, -1.2, -1, 0.9, 'rgba(255,255,255,.8)', 0); c.restore(); },
   paint(c) { B(c, -10, -16, 20, 16, 2, '#C9D2D8'); B(c, -11, -18, 22, 4, 2, '#FF8FB1'); c.beginPath(); c.moveTo(-6, -15); c.quadraticCurveTo(-5, -5, -3, -9); c.lineTo(-3, -15); c.closePath(); c.fillStyle = '#FF8FB1'; c.fill(); c.beginPath(); c.arc(0, -17, 10, Math.PI * 1.15, Math.PI * 1.85); c.strokeStyle = '#778'; c.lineWidth = 1.2; c.stroke(); },
 };
 
@@ -221,7 +228,7 @@ export function thingIcon(canvas, type) {
   canvas.width = s * dpr; canvas.height = s * dpr; canvas.style.width = canvas.style.height = s + 'px';
   const c = canvas.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, s, s);
   c.lineJoin = 'round';
-  const tall = { lamp: 0.72, mirror: 0.72, tv: 0.8, plant: 0.9, balloon: 0.85, telescope: 1.05, rug: 0.75, box: 0.95 }[type] || 1.25;
+  const tall = { lamp: 0.72, mirror: 0.72, tv: 0.8, plant: 0.9, balloon: 0.85, telescope: 1.05, rug: 0.75, box: 0.95, party: 1.05 }[type] || 1.25;
   c.translate(s / 2, type === 'balloon' ? s * 0.62 : s * 0.84); c.scale(tall, tall);
   TH[type](c, { water: 1 }, null, 0, false);
 }

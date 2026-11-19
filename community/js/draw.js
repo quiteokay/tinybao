@@ -83,6 +83,9 @@ function drawWindow(c, x, y, sky, d, dado) {
   B(c, x - 22, y - 49, 44, 4, 2, '#B98A5E', 1);
 }
 
+// Photos are stored as small JPEG data; each is turned into an image once and kept.
+const IMG = new Map();
+export function photoImg(p) { let im = IMG.get(p.id); if (!im) { im = new Image(); im.src = p.d; IMG.set(p.id, im); } return im.complete && im.naturalWidth ? im : null; }
 function drawMarks(c, S, f, col, x0, y0, type, t) {
   for (const m of S.marks) {
     if (m.k === 'photo') continue;
@@ -95,7 +98,13 @@ function drawMarks(c, S, f, col, x0, y0, type, t) {
   }
   if (type === 'living') {
     const slots = [[66, 100], [84, 100], [66, 82], [84, 82], [148, 100], [164, 100], [148, 82], [164, 82]];
-    S.marks.filter((m) => m.k === 'photo').forEach((m, i) => { const sl = slots[i % 8], x = x0 + sl[0], y = y0 - sl[1];
+    // real photos the visitor took come first, then the little drawn keepsakes
+    const real = (S.photos || []).slice(-8).reverse();
+    real.forEach((p, i) => { const sl = slots[i], x = x0 + sl[0], y = y0 - sl[1], im = photoImg(p);
+      c.save(); c.translate(x, y); c.rotate(((i * 37) % 7 - 3) * 0.02);
+      B(c, -8, -7, 16, 14.5, 0.8, '#FFFDF6', 1.2); if (im) c.drawImage(im, -6.5, -5.5, 13, 9.75); else { c.fillStyle = '#cfe6f2'; c.fillRect(-6.5, -5.5, 13, 9.75); }
+      c.restore(); });
+    S.marks.filter((m) => m.k === 'photo').slice(-(8 - real.length)).forEach((m, j) => { const i = real.length + j; if (i >= 8) return; const sl = slots[i], x = x0 + sl[0], y = y0 - sl[1];
       B(c, x - 7, y - 6, 14, 12, 1, '#FFF8E7', 1.3); c.strokeStyle = '#B98A5E'; c.lineWidth = 1.6; c.strokeRect(x - 7, y - 6, 14, 12);
       c.save(); c.translate(x, y + 4.5); c.scale(0.13, 0.13);
       if (m.what === 'cake') TH.cake(c, {}, S, 0); else { c.translate(-26, 0); drawBaoShape(c, {}, 0); c.translate(52, 0); drawBaoShape(c, { flavor: m.what === 'floor' ? 'matcha' : 'custard', expr: 'joy' }, 0); }
@@ -120,11 +129,11 @@ function poseOf(b, t) {
     case 'bath': yo = Math.sin(t * 2 + ph) * 1.2; facing = 0; break;
     case 'held': rot = Math.sin(t * 13) * 0.13; sq -= 0.08; expr = 'wow'; facing = 0; break;
     case 'dizzy': rot = Math.sin(t * 9) * 0.16; expr = 'dizzy'; facing = 0; break;
+    case 'roll': rot = Math.sin(t * 5 + ph) * 0.9; yo = Math.abs(Math.sin(t * 5 + ph)) * 3; sq += 0.05; break;
     case 'cry': dx = Math.sin(t * 30) * 0.8; sq += Math.sin(t * 10) * 0.04; break;
     default: sq += Math.sin(t * 2 + ph) * 0.014;
   }
   if (b.joyT > 0 && !['sleep', 'cry', 'dizzy'].includes(expr)) expr = 'joy';
-  if (b.vapor > 0) expr = 'wow';
   return { yo, sq, rot, expr, facing, dx };
 }
 
@@ -132,11 +141,9 @@ function drawBao(c, S, b, t) {
   const p = poseOf(b, t), X = b.x + p.dx, floorY = -b.floor * FH, Y = floorY - b.alt - p.yo, sz = b.size || 1;
   if (!b.held && !b.carriedBy && b.alt < 3 && !b.climb) { c.fillStyle = 'rgba(40,30,20,.13)'; c.beginPath(); c.ellipse(b.x, floorY, BAO * sz * (0.42 - p.yo * 0.004), 3.2, 0, 0, 7); c.fill(); }
   c.save(); c.translate(X, Y);
-  if (b.vapor > 0) { c.translate(Math.sin(t * 60) * 1.6 * b.vapor, 0); }
   const { w, h } = drawBaoShape(c, { flavor: b.flavor, acc: b.acc, size: sz, expr: p.expr, facing: p.facing, blink: b.blink > 0, squash: p.sq, rot: p.rot, pacifier: b.kind === 'baby' && !['cry', 'joy', 'chew'].includes(p.expr) }, t);
   if (b.carry) { c.save(); c.translate(0, -h + 2); if (b.carry.obj) TH[b.carry.obj.type](c, b.carry.obj, S, t, false); else drawCarry(c, b.carry, t); c.restore(); }
   if (b.prop) { c.save(); if ((b.facing || 1) < 0) c.scale(-1, 1); drawProp(c, b.prop, t, w); c.restore(); }
-  if (b.vapor > 0) { c.strokeStyle = `rgba(255,120,90,${0.5 + 0.5 * b.vapor})`; c.lineWidth = 3; c.beginPath(); c.arc(0, -h * 0.45, w * 0.75, -Math.PI / 2, -Math.PI / 2 + b.vapor * Math.PI * 2); c.stroke(); }
   c.restore();
   // things drawn in front of a bao that is in something
   if (b.front === 'blanket') { c.save(); c.translate(b.x, floorY - b.alt); B(c, -27, -21, 52, 22, [8, 8, 4, 4], `hsl(${(b.ph * 60) | 0} 60% 80%)`); c.restore(); }
@@ -158,11 +165,25 @@ function drawParts(c) {
     else if (p.k === 'steam') { c.globalAlpha = a * 0.75; c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, (4 + p.age * 7) * p.s, 0, 7); c.fill(); }
     else if (p.k === 'puff') { c.globalAlpha = a * 0.6; c.fillStyle = '#E9DFD2'; c.beginPath(); c.arc(x, y, (3 + p.age * 8) * p.s, 0, 7); c.fill(); }
     else if (p.k === 'soap') { c.strokeStyle = 'rgba(255,255,255,.95)'; c.fillStyle = 'rgba(200,235,255,.35)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y, 2.5 + p.r % 3, 0, 7); c.fill(); c.stroke(); }
+    else if (p.k === 'confetti') { c.save(); c.translate(x, y); c.rotate(p.age * 7 + p.r); c.fillStyle = ['#FF8FB1', '#FFD166', '#7CC6F2', '#7CC96B', '#B58BD9'][Math.floor(p.r * 10) % 5]; c.fillRect(-2.5, -1.5, 5, 3); c.restore(); }
     else if (p.k === 'drop') { c.fillStyle = '#8CCBF0'; c.beginPath(); c.arc(x, y, 2 * p.s, 0, 7); c.fill(); }
   }
   c.globalAlpha = 1;
 }
 
+// Party streamers and bunting, up until the end of the day.
+function drawDecor(c, S, t) {
+  const D = S.decor; if (!D || D.day !== S.day) return;
+  const top = D.outside ? -96 : -(D.f + 1) * FH + SLAB + 4, y0 = -D.f * FH, w = D.x1 - D.x0, n = Math.max(4, Math.floor(w / 16));
+  if (D.outside) for (const x of [D.x0, D.x1]) { c.strokeStyle = '#B98A5E'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, top); c.stroke(); }
+  for (const [dy, sag] of [[0, 14], [7, 22]]) {
+    c.strokeStyle = 'rgba(58,42,34,.6)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(D.x0 + 4, y0 + top - y0 + dy);
+    c.quadraticCurveTo((D.x0 + D.x1) / 2, top + dy + sag * 2, D.x1 - 4, top + dy); c.stroke();
+    for (let i = 1; i < n; i++) { const u = i / n, x = D.x0 + 4 + u * (w - 8), y = top + dy + sag * 4 * u * (1 - u) * 1 + Math.sin(t * 2 + i) * 0.6;
+      if (dy === 0) { c.beginPath(); c.moveTo(x - 4, y); c.lineTo(x + 4, y); c.lineTo(x, y + 7); c.closePath(); c.fillStyle = ['#FF8FB1', '#FFD166', '#7CC6F2', '#7CC96B', '#B58BD9'][i % 5]; c.fill(); }
+      else if (i % 3 === 0) { c.strokeStyle = ['#FF8FB1', '#7CC6F2', '#FFD166'][i % 3 === 0 ? (i / 3) % 3 : 0]; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 4, y + 9, x - 1, y + 16 + Math.sin(t * 3 + i) * 2); c.stroke(); } }
+  }
+}
 export function render(c, V, S, t) {
   const h = clock.hour(), w = weatherAt(S), d = darkness(h);
   c.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
@@ -234,6 +255,7 @@ export function render(c, V, S, t) {
   const order = S.baos.filter((b) => !b.held).sort((a, b2) => (a.carriedBy ? 1 : 0) - (b2.carriedBy ? 1 : 0) || (a.front ? 0 : 1) - (b2.front ? 0 : 1));
   for (const b of order) drawBao(c, S, b, t);
   drawBallGames(c, S, t);
+  drawDecor(c, S, t);
   // rooms with a front wall: only the window shows what is inside
   for (let f = 0; f < nf; f++) for (let col = 0; col < COLS; col++) if (walled(S, f, col) && S.bare[f + ',' + col] == null) {
     const [wl, wr] = WALLWIN[S.floors[f][col]], x0 = col * RW, y0 = -f * FH, top = y0 - FH + SLAB, sill = y0 - 9, wt = y0 - 94;
@@ -267,7 +289,7 @@ export function render(c, V, S, t) {
     c.globalCompositeOperation = 'lighter';
     if (S.fire.fuel > 0) { const fp = R.fx.find((f) => f.kind === 'fireplace'); if (fp) { const fl = 0.8 + Math.sin(t * 11) * 0.08, g = c.createRadialGradient(fp.x, -18, 4, fp.x, -18, 120); g.addColorStop(0, `rgba(255,150,60,${0.38 * d * fl})`); g.addColorStop(1, 'rgba(255,150,60,0)'); c.fillStyle = g; c.fillRect(RW, -FH + SLAB, RW, FH - SLAB); } }
     for (const L of LIGHTS) { const g = c.createRadialGradient(L.x, L.y, 2, L.x, L.y, L.r); g.addColorStop(0, `rgba(${L.col || '255,225,150'},${0.42 * d})`); g.addColorStop(1, `rgba(${L.col || '255,225,150'},0)`); c.fillStyle = g; c.fillRect(L.x - L.r, L.y - L.r, L.r * 2, L.r * 2); }
-    for (const o of S.objects) if (o.type === 'lamp' && !o.held) { const y = -o.floor * FH - 50, g = c.createRadialGradient(o.x, y, 3, o.x, y, 80); g.addColorStop(0, `rgba(255,225,150,${0.4 * d})`); g.addColorStop(1, 'rgba(255,225,150,0)'); c.fillStyle = g; c.fillRect(o.x - 80, y - 80, 160, 160); }
+    for (const o of S.objects) if (o.type === 'lamp' && !o.held && !o.off) { const y = -o.floor * FH - 50, g = c.createRadialGradient(o.x, y, 3, o.x, y, 80); g.addColorStop(0, `rgba(255,225,150,${0.4 * d})`); g.addColorStop(1, 'rgba(255,225,150,0)'); c.fillStyle = g; c.fillRect(o.x - 80, y - 80, 160, 160); }
     c.globalCompositeOperation = 'source-over';
   }
   // whatever the visitor is holding is drawn on top of everything
