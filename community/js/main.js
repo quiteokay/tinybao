@@ -5,7 +5,7 @@ import { drawBaoShape } from './drawbao.js';
 import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, renameBao, plansInfo, choosePlan, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
 import * as music from './music.js';
-import { openBook, closeBook, bookOpen, bookPage, bookCount, bookBusy, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
+import { openBook, closeBook, bookOpen, bookPage, bookCount, bookBusy, bookJump, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
 import { usePhotoStore, putFull, getFull, delFull, putDays, daysFrom, oldestDay, allDays, clearDays } from './photos.js';
 import { FLAVORS } from './drawbao.js';
 import { SIGN } from './drawsites.js';
@@ -15,7 +15,7 @@ import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 10; // keep in step with version.json
+const VERSION = 11; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
@@ -178,6 +178,7 @@ window.addEventListener('keydown', (e) => {
   if (!$('diary').hidden) { if (e.key === 'Escape') closeDiary(); else if (e.key === 'ArrowRight') turnPage(1); else if (e.key === 'ArrowLeft') turnPage(-1); return; }
   if (!$('photoView').hidden) { if (e.key === 'Escape') closePhoto(); return; }
   if (!$('baoCard').hidden) { if (e.key === 'Escape') closeCard(); return; }
+  if (!$('settings').hidden) { if (e.key === 'Escape') closeSettings(); return; }
   if (!$('plansCard').hidden) { if (e.key === 'Escape') closePlans(); return; }
   if (e.key === 'Escape') setArmed(-1);
   const k = { ArrowUp: [0, 60], ArrowDown: [0, -60], ArrowLeft: [-60, 0], ArrowRight: [60, 0] }[e.key];
@@ -416,11 +417,23 @@ $('bcName').addEventListener('input', () => {
 });
 $('tag').addEventListener('click', (e) => { if (e.target.closest('.edit') && tagFor) openCard('edit', tagFor); });
 // ---------- music ----------
-function drawMusicBtn() { const on = music.isOn(); $('bMusic').innerHTML = `<svg viewBox="0 0 24 24"><path d="M9 17V6l10-2v11" fill="none"/><circle cx="6.5" cy="17.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/><circle cx="16.5" cy="15.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/>${on ? '' : '<path d="M4 4l16 16" stroke="#E8604C"/>'}</svg>`;
-  $('bMusic').classList.toggle('on', on); $('bMusic').title = on ? 'Music is on' : 'Music is off'; $('bMusic').setAttribute('aria-pressed', String(on)); }
-$('bMusic').addEventListener('click', () => { snd.unlock(); music.setOn(!music.isOn()); drawMusicBtn(); });
-function drawSoundBtn() { const m = snd.isMuted(); $('bSound').innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="#FFF3D6"/>${m ? '<path d="M16 9.5l5 5M21 9.5l-5 5"/>' : '<path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'}</svg>`; $('bSound').title = m ? 'Sound is off' : 'Sound is on'; $('bSound').setAttribute('aria-pressed', String(!m)); }
-$('bSound').addEventListener('click', () => { snd.unlock(); snd.setMuted(!snd.isMuted()); drawSoundBtn(); snd.play('pet'); });
+// ---------- settings: music, sounds, updates, and saving a copy of the community ----------
+function drawSettings() {
+  $('swMusic').setAttribute('aria-checked', String(music.isOn())); $('swSound').setAttribute('aria-checked', String(!snd.isMuted()));
+  $('stVersion').textContent = updateReady ? 'Something new is ready!' : `You have version ${VERSION}`;
+  $('stUpdate').textContent = updateReady ? 'update now' : 'check for updates'; $('stUpdate').classList.toggle('new', updateReady);
+}
+let updateReady = false;
+function openSettings() { drawSettings(); $('settings').hidden = false; $('settings').dataset.at = performance.now(); snd.unlock(); snd.play('tick'); }
+function closeSettings() { $('settings').hidden = true; }
+$('bSettings').addEventListener('click', openSettings);
+$('stDone').addEventListener('click', closeSettings);
+$('settings').addEventListener('click', (e) => { if (e.target === $('settings') && performance.now() - +$('settings').dataset.at > 450) closeSettings(); });
+$('swMusic').addEventListener('click', () => { snd.unlock(); music.setOn(!music.isOn()); drawSettings(); });
+$('swSound').addEventListener('click', () => { snd.unlock(); snd.setMuted(!snd.isMuted()); drawSettings(); snd.play('pet'); });
+$('stUpdate').addEventListener('click', () => { closeSettings(); checkForUpdates(); });
+$('stExport').addEventListener('click', () => exportCopy());
+$('stImport').addEventListener('click', () => $('importFile').click());
 
 // ---------- diary ----------
 function dayLabel(key) {
@@ -440,7 +453,7 @@ async function archiveOld() {
 }
 let diarySpan = RECENT_DAYS, opening = 0;
 async function openDiary(at, span, fromEnd) {
-  const ticket = ++opening; span = span || RECENT_DAYS; diarySpan = span; $('diary').hidden = false;
+  const ticket = ++opening; span = span || RECENT_DAYS; diarySpan = span; $('diary').hidden = false; $('swipeHint').hidden = swipes() >= 2;
   const from = dayKey(clock.t - span * 86400000), older = await daysFrom(from), oldest = await oldestDay();
   if (ticket !== opening || $('diary').hidden) return;
   const entries = older.concat(S.diary).filter((e) => e.d >= from).sort((a, b) => a.t - b.t);
@@ -453,10 +466,6 @@ async function openDiary(at, span, fromEnd) {
   people.sort((a, b) => b.name.length - a.name.length);
   openBook({ host: $('bookPages'), nav: $('bookNav'), entries, hasEarlier, photos: S.photos || [], people, dayLabel, at: typeof at === 'number' ? at : null, fromEnd,
     onEarlier: () => openDiary(null, span + 240, bookCount()),
-    backCover: `<div class="about"><h3>Your community</h3><p>The whole community (every bao, the house, the photos and this diary) lives in this browser only, so it stays private to you.</p>
-      <p>To keep it safe, or to move it to another device, save a copy:</p>
-      <button data-act="export">save a copy of the community</button><button data-act="import">restore the community from a copy</button><small>swipe down to close the book</small></div>`,
-    onAct: (a) => { if (a === 'export') exportCopy(); if (a === 'import') $('importFile').click(); },
     onPhoto: (id) => openPhoto(id),
     onTurn: () => snd.play('page'),
     onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } } });
@@ -480,7 +489,17 @@ $('bCam').addEventListener('pointerdown', () => chordDown('c'));
 let typed = '';
 window.addEventListener('keydown', (e) => { if (e.key.length !== 1 || (e.target.closest && e.target.closest('input'))) return; typed = (typed + e.key.toLowerCase()).slice(-4); if (typed === 'shop' && zoomedOut()) { typed = ''; openDoor(shopApi); } });
 $('bDiary').addEventListener('click', () => { if (!swallowed()) openDiary(); });
-swipeToClose($('diary'), document.querySelector('#diary .book'), () => closeDiary(), bookBusy);
+swipeToClose($('diary'), document.querySelector('#diary .book'), () => { noteSwipe(); closeDiary(); }, bookBusy);
+// "swipe down to close" shows on the cover until they have closed the diary that way twice
+const swipes = () => { try { return +localStorage.getItem('tinybao.swipes') || 0; } catch (e) { return 2; } };
+function noteSwipe() { try { localStorage.setItem('tinybao.swipes', String(swipes() + 1)); } catch (e) { /* ignore */ } }
+// first page: the very first day, so the whole archive is loaded; latest: today's writing
+$('bookFirst').addEventListener('click', async () => {
+  const oldest = await oldestDay(), first = [oldest, S.diary.length ? S.diary[0].d : null].filter(Boolean).sort()[0];
+  const span = first ? Math.ceil((clock.t - new Date(first + 'T00:00:00').getTime()) / 86400000) + 2 : diarySpan;
+  if (span > diarySpan) openDiary(0, span); else if (!bookJump('first')) snd.play('blip');
+});
+$('bookLast').addEventListener('click', () => { if (!bookJump('last')) snd.play('blip'); });
 $('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) closeDiary(); });
 window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(bookPage(), diarySpan); });
 async function exportCopy() { const data = JSON.parse(serialize()); data.diary = (await allDays()).concat(data.diary); // the whole diary goes in the copy
@@ -498,9 +517,8 @@ $('importFile').addEventListener('change', async (e) => {
 const notesSince = (info, v) => info.changes.filter((c) => c.v > v).flatMap((c) => c.notes);
 // The gift box: checks quietly when the app opens, and shows a dot when there is something new.
 async function peekForUpdates() {
-  try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); const info = await r.json(); $('bGift').classList.toggle('new', info.v > VERSION); } catch (e) { /* offline: no dot */ }
+  try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); const info = await r.json(); updateReady = info.v > VERSION; $('bSettings').classList.toggle('new', updateReady); } catch (e) { /* offline: no dot */ }
 }
-$('bGift').addEventListener('click', () => { snd.unlock(); snd.play('tick'); checkForUpdates(); });
 async function checkForUpdates(link) {
   link = link || { set textContent(v) {} }; link.textContent = 'checking…';
   let info;
@@ -597,7 +615,7 @@ function boot() {
   }
   announceUpdate(); peekForUpdates();
   if (WORKSHOP) mountWorkshop(shopApi);
-  bootDay = S.tray.day; drawTray(); drawSoundBtn(); drawMusicBtn(); save();
+  bootDay = S.tray.day; drawTray(); save();
   setInterval(save, 8000);
   archiveOld(); setInterval(archiveOld, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });

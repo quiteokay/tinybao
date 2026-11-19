@@ -94,19 +94,20 @@ function beginTurn(dir, cy) {
   const pw = B.pw, xs = B.spread ? pw : 0, L = B.layer; L.innerHTML = '';
   const T = { dir, cy, xs, boxL: dir > 0 ? xs : xs - pw };
   T.C = { x: dir > 0 ? xs + pw : xs - pw, y: cy }; T.land = { x: 2 * xs - T.C.x, y: cy };
-  let front, back, under;
+  // which pages are where during the turn (indexes, so each keeps its own look while it moves)
+  let fi, bi = null, ui;
   if (B.spread) {
-    if (dir > 0) { L.appendChild(el('pg-left', pageHtml(B.i) ?? '', 0)); front = pageHtml(B.i + 1); back = pageHtml(B.i + 2); under = pageHtml(B.i + 3); }
-    else { L.appendChild(el('pg-right', pageHtml(B.i + 1) ?? '', pw)); front = pageHtml(B.i); back = pageHtml(B.i - 1); under = pageHtml(B.i - 2); }
-  } else if (dir > 0) { front = pageHtml(B.i); back = ''; under = pageHtml(B.i + 1); }
+    if (dir > 0) { L.appendChild(el('pg-left ' + pageCls(B.i), pageHtml(B.i) ?? '', 0)); fi = B.i + 1; bi = B.i + 2; ui = B.i + 3; }
+    else { L.appendChild(el('pg-right ' + pageCls(B.i + 1), pageHtml(B.i + 1) ?? '', pw)); fi = B.i; bi = B.i - 1; ui = B.i - 2; }
+  } else if (dir > 0) { fi = B.i; ui = B.i + 1; }
   else { // one page at a time, going back: the previous page was turned away to the left, so play its turn in reverse
-    T.boxL = 0; T.C = { x: pw, y: cy }; T.land = { x: -pw, y: cy }; T.rev = true;
-    front = pageHtml(B.i - 1); back = ''; under = pageHtml(B.i); }
+    T.boxL = 0; T.C = { x: pw, y: cy }; T.land = { x: -pw, y: cy }; T.rev = true; fi = B.i - 1; ui = B.i; }
+  const front = pageHtml(fi), back = bi == null ? '' : pageHtml(bi), under = pageHtml(ui);
   const side = (x) => (B.spread ? (x < pw ? 'pg-left' : 'pg-right') : '');
-  if (under != null) { T.under = el(side(T.boxL), under, T.boxL); L.appendChild(T.under); T.shade = document.createElement('div'); T.shade.className = 'shade'; T.under.appendChild(T.shade); }
-  T.front = el(side(T.boxL) + ' turning', front ?? '', T.boxL); L.appendChild(T.front);
+  if (under != null) { T.under = el(side(T.boxL) + ' ' + pageCls(ui), under, T.boxL); L.appendChild(T.under); T.shade = document.createElement('div'); T.shade.className = 'shade'; T.under.appendChild(T.shade); }
+  T.front = el(side(T.boxL) + ' turning ' + pageCls(fi), front ?? '', T.boxL); L.appendChild(T.front);
   const wrap = document.createElement('div'); wrap.className = 'backwrap'; L.appendChild(wrap);
-  T.back = el((B.spread ? (dir > 0 ? 'pg-left' : 'pg-right') : '') + ' back' + (back ? '' : ' blank'), back ?? '', T.boxL); wrap.appendChild(T.back);
+  T.back = el((B.spread ? (dir > 0 ? 'pg-left' : 'pg-right') : '') + ' back' + (back ? ' ' + pageCls(bi) : ' blank'), back ?? '', T.boxL); wrap.appendChild(T.back);
   T.from = T.rev ? T.land : T.C; T.to = T.rev ? T.C : T.land; T.P = { ...T.from };
   B.T = T; setP(T.P); return true;
 }
@@ -165,11 +166,16 @@ export function openBook(opts) {
   B = { host, layer, pw, ph, spread, opts, nav: opts.nav, T: null, anim: false };
   const { pages, lastText } = paginate({ ...opts, host }, pw, ph);
   const at = opts.fromEnd != null ? Math.max(0, pages.length - opts.fromEnd - 1) : opts.at != null ? Math.min(opts.at, pages.length - 1) : lastText;
-  B.pages = pages; B.i = spread ? at - (at % 2) : at;
+  B.pages = pages; B.lastText = lastText; B.i = spread ? at - (at % 2) : at;
   host.classList.toggle('spread', spread);
   layoutStatic();
 }
 export const bookOpen = () => !!B;
+// Straight to a page, no turning (the first page, or the latest writing).
+export function bookJump(which) {
+  if (!B || B.anim || B.T) return false; const i = which === 'last' ? B.lastText : 0, to = B.spread ? i - (i % 2) : i;
+  if (to === B.i) return false; B.i = to; layoutStatic(); B.opts.onTurn(); return true;
+}
 export const bookPage = () => (B ? B.i : null);
 export const bookCount = () => (B ? B.pages.length : 0);
 export const bookBusy = () => !!(B && (B.T || B.anim));
