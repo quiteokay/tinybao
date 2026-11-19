@@ -9,13 +9,28 @@
   <link rel="apple-touch-icon" href="/lilbao_351.png">
   <link rel="icon" type="image/png" href="/lilbao_351.png">
   <title>tiny bao community</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
   <button class="round" id="bMusic" aria-label="Music on or off"></button>
   <button class="round" id="bSound" aria-label="Sound on or off"></button>
   <div id="tag" hidden></div>
+  <div id="baoCard" hidden>
+    <div class="bc">
+      <canvas id="bcPic" width="160" height="140" aria-hidden="true"></canvas>
+      <h2 id="bcTitle"></h2>
+      <p id="bcAbout"></p>
+      <label class="bcName">Name <input id="bcName" maxlength="14" autocomplete="off" spellcheck="false"></label>
+      <div id="bcSwatches" role="radiogroup" aria-label="Colour"></div>
+      <p id="bcErr"></p>
+      <div class="cardBtns"><button id="bcCancel">not now</button><button id="bcOk">done</button></div>
+    </div>
+  </div>
+  <div id="photoView" hidden>
+    <img id="pvImg" alt="A photo of the community">
+    <div class="pvBar"><span id="pvWhen"></span><span class="pvBtns"><button id="pvDel">delete</button><button id="pvClose" aria-label="Close">×</button></span></div>
+  </div>
   <div id="hint" hidden></div>
 
   <div id="card" hidden>
@@ -49,6 +64,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="js/main.js?v=5"></script>
+  <script type="module" src="js/main.js?v=6"></script>
 </body>
 </html>

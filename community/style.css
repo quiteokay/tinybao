@@ -12,7 +12,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .round:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(58,42,34,.25); }
 .round svg { width: 26px; height: 26px; fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .right { display: flex; gap: 8px; }
-#bCam.on { background: #BFE6F5; animation: pulse 1s infinite; }
+
 @keyframes pulse { 50% { box-shadow: 0 3px 0 rgba(58,42,34,.25), 0 0 0 6px rgba(255,120,90,.35); } }
 
 #tray { display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -27,6 +27,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 #tag { position: fixed; z-index: 5; transform: translate(-50%, -100%); background: #fff; border: 2px solid var(--ink); border-radius: 14px; padding: 4px 10px; font-size: 13px; font-weight: 700;
   white-space: nowrap; pointer-events: none; box-shadow: 0 2px 0 rgba(58,42,34,.2); }
 #tag small { font-weight: 500; opacity: .75; font-size: 12px; }
+#tag .edit { pointer-events: auto; margin-left: 6px; border: 1.5px solid var(--ink); border-radius: 50%; width: 24px; height: 24px; font-size: 12px; line-height: 1; background: #FFF3D6; vertical-align: middle; }
 #hint { position: fixed; left: 50%; bottom: calc(112px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(58,42,34,.85); color: #fff; padding: 6px 14px; border-radius: 16px; font-size: 13px; font-weight: 600; pointer-events: none; white-space: nowrap; }
 
 #card { position: fixed; z-index: 20; left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); width: min(420px, calc(100vw - 24px)); background: var(--paper);
@@ -41,14 +42,14 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 
 #diary { position: fixed; inset: 0; z-index: 40; background: rgba(40,30,50,.35); display: grid; place-items: end center; }
 #diary[hidden], #card[hidden], #tag[hidden], #hint[hidden] { display: none; }
-.book { width: auto; max-width: 100vw; background: #FBF1DC; border: 2px solid var(--ink); border-bottom: none; border-radius: 22px 22px 0 0; display: flex; flex-direction: column; animation: up .28s ease-out; }
+.book { touch-action: none; transition: transform .25s ease; width: auto; max-width: 100vw; background: #FBF1DC; border: 2px solid var(--ink); border-bottom: none; border-radius: 22px 22px 0 0; display: flex; flex-direction: column; animation: up .28s ease-out; }
 @media (min-width: 700px) { #diary { place-items: center; } .book { border-bottom: 2px solid var(--ink); border-radius: 22px; } }
 @keyframes up { from { transform: translateY(40px); opacity: 0; } }
 .bookHead { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px 8px; }
 .bookHead h2 { font-size: 19px; flex: 1; }
 #bookNav { font-size: 12px; font-weight: 700; opacity: .55; }
 .bookHead button { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; border: 2px solid var(--ink); background: #fff; font-weight: 700; }
-#bookPages { position: relative; margin: 0 auto; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+#bookPages { position: relative; margin: 0 auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 #bookPages .layer { position: absolute; inset: 0; overflow: hidden; }
 .page { position: absolute; top: 0; padding: 12px 20px 30px; overflow: hidden; background-color: var(--paper);
   background-image: repeating-linear-gradient(transparent 0 29px, rgba(111,168,220,.22) 29px 30px); background-position: 0 12px; }
@@ -84,3 +85,25 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 #bMusic { position: fixed; z-index: 4; right: 60px; top: max(12px, env(safe-area-inset-top)); width: 40px; height: 40px; }
 #bMusic svg { width: 22px; height: 22px; }
 #bMusic.on { background: #FFE08A; }
+
+#baoCard { position: fixed; inset: 0; z-index: 45; background: rgba(40,30,50,.35); display: grid; place-items: center; padding: 16px; }
+#baoCard[hidden], #photoView[hidden] { display: none; }
+.bc { width: min(360px, 100%); background: var(--paper); border: 2px solid var(--ink); border-radius: 22px; padding: 14px 18px 14px; text-align: center; box-shadow: 0 6px 0 rgba(58,42,34,.22); animation: drop .35s cubic-bezier(.3,1.4,.5,1); }
+#bcPic { width: 160px; height: 140px; display: block; margin: -2px auto 0; }
+.bc h2 { font-size: 20px; margin: 2px 0 4px; }
+#bcAbout { font-size: 14px; line-height: 1.4; opacity: .85; margin-bottom: 10px; }
+.bcName { display: flex; align-items: center; gap: 8px; justify-content: center; font-weight: 700; font-size: 14px; }
+.bcName input { font: inherit; font-weight: 700; font-size: 17px; width: 11em; padding: 6px 10px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; text-align: center; color: var(--ink); }
+#bcSwatches { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 12px 0 2px; }
+#bcSwatches button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(58,42,34,.45); padding: 0; }
+#bcSwatches button.on { border-color: var(--ink); box-shadow: 0 0 0 3px #FFD166; }
+#bcErr { min-height: 18px; font-size: 13px; color: #C0392B; font-weight: 700; margin-top: 4px; }
+.bc .cardBtns { justify-content: center; }
+#bcOk { background: #FFD166; }
+#photoView { position: fixed; inset: 0; z-index: 60; background: rgba(20,14,10,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); touch-action: none; }
+#pvImg { max-width: 100%; max-height: calc(100% - 64px); border: 6px solid #fff; border-radius: 4px; box-shadow: 0 8px 30px rgba(0,0,0,.4); transition: transform .2s ease; }
+.pvBar { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: min(100%, 720px); margin-top: 12px; color: #fff; font-size: 14px; font-weight: 700; }
+.pvBtns { display: flex; gap: 8px; }
+.pvBar button { border: 2px solid #fff; color: #fff; background: transparent; border-radius: 14px; padding: 6px 14px; font-weight: 700; }
+.pvBar button.sure { background: #E8604C; border-color: #E8604C; }
+#pvClose { width: 36px; height: 36px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; }

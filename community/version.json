@@ -1,5 +1,5 @@
 {
-  "v": 5,
+  "v": 6,
   "files": [
     "index.html",
     "style.css",
@@ -14,9 +14,22 @@
     "js/drawsites.js",
     "js/sound.js",
     "js/music.js",
-    "js/book.js"
+    "js/book.js",
+    "js/photos.js"
   ],
   "changes": [
+    {
+      "v": 6,
+      "notes": [
+        "meet each new bao before they move in, and give any bao a new name or colour",
+        "three new bun colours: peach, sky and mint",
+        "tap a bao once to follow it",
+        "move something and somebody comes to see",
+        "tap a photo in the diary to see it full size, or delete it",
+        "the camera snaps straight away, the whole screen",
+        "pull the diary down to close it"
+      ]
+    },
     {
       "v": 5,
       "notes": [

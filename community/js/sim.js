@@ -731,12 +731,25 @@ function landedBao(S, b) {
   b.fromRoom = null;
 }
 // The visitor adds a new resident: it drops in wherever they let go.
-export function dropBao(x, h) {
-  const S = R.S, spec = nextAdded(S); if (!spec) return null;
+export function dropBao(x, h, pick) {
+  const S = R.S, base = nextAdded(S); if (!base) return null;
+  const spec = { ...base, ...(pick || {}) };
+  (S.usedAdded = S.usedAdded || []).push(base.name);
   const b = addNewcomer(S, spec, false); initBao(b);
   const f = landFloor(S, x, h), [lo, hi] = xBounds(S, f);
   Object.assign(b, { x: clamp(x, lo, hi), floor: f, alt: Math.max(0, h - f * FH), fall: true, vy: 0, hand: true });
   return b;
+}
+// A new name or colour, chosen by the visitor. The diary is updated so old entries still read right.
+export function renameBao(b, name, flavor) {
+  const S = R.S, old = b.name;
+  if (flavor) b.flavor = flavor;
+  if (!name || name === old) return;
+  b.name = name;
+  const i = S.everNames.indexOf(old); if (i >= 0) S.everNames[i] = name; else S.everNames.push(name);
+  const re = new RegExp('(^|[^\\p{L}])' + old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}])', 'gu');
+  for (const e of S.diary) if (e.text.includes(old)) e.text = e.text.replace(re, (m, pre) => pre + name);
+  for (const e of S.diary) if (e.a === old) e.a = name;
 }
 export function dropThing(type, x, h) {
   const S = R.S, f = landFloor(S, x, h), [lo, hi] = xBounds(S, f);
@@ -776,7 +789,7 @@ export function pickUpThingByHand(o) {
 }
 export function releaseThing(o) {
   const S = R.S, h = o.alt, f = landFloor(S, o.x, h), [lo, hi] = xBounds(S, f);
-  o.x = clamp(o.x, lo, hi); o.floor = f; o.alt = Math.max(0, h - f * FH); o.held = false; o.falling = true; o.vy = 0; o.t = clock.t;
+  o.x = clamp(o.x, lo, hi); o.floor = f; o.alt = Math.max(0, h - f * FH); o.held = false; o.falling = true; o.vy = 0; o.t = clock.t; o.moved = true;
 }
 function landedThing(S, o) {
   o.sq = 0.3;
@@ -786,6 +799,10 @@ function landedThing(S, o) {
   if (o.type === 'treats') return burstTreats(S, o);
   if (o.type === 'cake') { log(S, 'cake', {}, { important: true }); addMark(S, { k: 'photo', what: 'cake' }); }
   if (o.unseen) { reactTo(S, o); startleNear(S, o.x, o.floor, 230); }
+  else if (o.moved) { // moved by the visitor: somebody comes to see where it went (not more than every 20 seconds per thing)
+    o.moved = false;
+    if (clock.t - (o.lastReact || 0) > 20000 && !['treat'].includes(o.type)) { o.lastReact = clock.t; reactTo(S, o); }
+  }
 }
 
 // ---------- somebody always comes to see what you dropped ----------
@@ -896,6 +913,7 @@ function joinPlan(S, o) {
     act(10, { pose: chance(0.5) ? 'dance' : 'jump', expr: 'joy', start: (b) => { b.hurry = 0; b.facing = -side; }, tick: (b, dt) => sparkle(b, dt, ['heart', 'star', 'note']), done: (b) => { b.needs.fun = 1; b.needs.social = Math.min(1, b.needs.social + 0.3); } })];
 }
 function reactTo(S, o) {
+  o.lastReact = clock.t;
   const pool = freeAdults(S).sort((p, q) => near(p, o) - near(q, o)), r = pool[0];
   if (!r) return; // the inspect activity will find it in time
   setPlan(r, [act(0.7, { pose: 'jump', expr: 'wow', start: (b) => { say(b, 'ex', 1.2); sfx('blip'); } }), ...(USE[o.type] || USE._)(S, o)], 'react', 'off to see what that was');

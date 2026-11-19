@@ -10,6 +10,9 @@ export const FLAVORS = {
   rosy:    { fill: '#FFECE7', shade: '#F8D6CF', pleat: '#EEBDB4' },
   wheat:   { fill: '#F3E2C6', shade: '#E4CCA5', pleat: '#D2B588' },
   sesame:  { fill: '#FCF5E5', shade: '#F1E4C9', pleat: '#E7D4B3', seeds: true },
+  peach:   { fill: '#FFE6D2', shade: '#F9CFAE', pleat: '#EFB98F' },
+  sky:     { fill: '#E3F1FB', shade: '#C9E1F3', pleat: '#AECDE6' },
+  mint:    { fill: '#DFF5EC', shade: '#C2E8D8', pleat: '#A3D6C0' },
 };
 
 const EXPR = {

@@ -2,20 +2,24 @@
 import { RW, FH, W, OUT, BAO, clamp, clock, dayKey, hourOf } from './core.js';
 import { newState, nFloors, weatherAt, adults, ext, minFloor, nextAdded } from './world.js';
 import { drawBaoShape } from './drawbao.js';
-import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
+import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, renameBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
 import * as music from './music.js';
-import { openBook, closeBook, bookOpen, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
+import { openBook, closeBook, bookOpen, bookPage, bookBusy, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
+import { usePhotoStore, putFull, getFull, delFull } from './photos.js';
+import { FLAVORS } from './drawbao.js';
 import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 5; // keep in step with version.json
+const VERSION = 6; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
 const TEST = ['speed', 'skipDays', 'hour', 'fresh', 'test'].some((k) => Q.has(k));
 if (Q.has('u') && history.replaceState) history.replaceState(null, '', location.pathname + (TEST ? '?test' : '')); // tidy the address after an update
 const KEY = 'tinybao.community.v1' + (TEST ? '.test' : '');
+usePhotoStore(TEST ? '-test' : '');
 const canvas = $('c'), ctx = canvas.getContext('2d');
 let S, V = { vw: 0, vh: 0, dpr: 1, s: 1, cx: W / 2, cy: 0, gy: 0, wx0: 0, wx1: 0 }, baseS = 1;
 
@@ -104,11 +108,10 @@ function hit(sx, sy) {
   const f = furnAt(p.x, p.h); if (f) return { furn: f };
   return null;
 }
-const ptrs = new Map(); let down = null, pinch = null, armed = -1, camOn = false, tagFor = null, tagUntil = 0;
+const ptrs = new Map(); let down = null, pinch = null, armed = -1, tagFor = null, tagUntil = 0;
 function showTag(b) { tagFor = b; tagUntil = performance.now() + 4500; }
 function setHint(text) { const h = $('hint'); if (text) { h.textContent = text; h.hidden = false; } else h.hidden = true; }
-function setCam(on) { camOn = on; $('bCam').classList.toggle('on', on); setHint(on ? 'tap anywhere to take a photo' : armed >= 0 ? 'tap anywhere to drop it' : ''); }
-function setArmed(i) { armed = i; if (i >= 0 && camOn) setCam(false); drawTray(); setHint(i === BAO_SLOT ? 'tap anywhere to drop the new bao in' : i >= 0 ? 'tap anywhere to drop it' : ''); }
+function setArmed(i) { armed = i; drawTray(); setHint(i === BAO_SLOT ? `tap anywhere to drop ${todaysBao().name} in` : i >= 0 ? 'tap anywhere to drop it' : ''); }
 
 canvas.addEventListener('pointerdown', (e) => {
   snd.unlock(); music.resumeIfOn();
@@ -147,15 +150,13 @@ function pointerEnd(e) {
   else if (d.mode === 'bao') { releaseBao(d.t.bao); save(); }
   else if (d.mode === 'thing') { releaseThing(d.t.thing); save(); }
   else if (!d.moved && e.type === 'pointerup') {
-    if (camOn) { const p = toWorld(e.clientX, e.clientY); takePhoto(p.x, p.h, false); setCam(false); }
-    else if (armed >= 0) { const p = toWorld(e.clientX, e.clientY); useTray(armed, p.x, p.h); }
+    if (armed >= 0) { const p = toWorld(e.clientX, e.clientY); useTray(armed, p.x, p.h); }
     else if (d.t && d.t.bao) {
-      const now = performance.now(), b = d.t.bao;
-      petBao(b); snd.play('pet'); showTag(b);
-      if (lastTap.b === b && now - lastTap.t < 400) { startFollow(b); snd.play('blip'); lastTap = { t: 0, b: null }; } else lastTap = { t: now, b };
+      const b = d.t.bao;
+      petBao(b); snd.play('pet'); startFollow(b); lastTap = { t: 0, b: null };
     }
     else if (d.t && d.t.thing) { d.t.thing.sq = 0.3; snd.play('blip'); }
-    else if (d.t && d.t.furn && armed < 0) { setHint('press and hold to move it'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (!camOn && armed < 0 && !(down && down.mode === 'furn')) setHint(''); }, 1500); }
+    else if (d.t && d.t.furn && armed < 0) { setHint('press and hold to move it'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (armed < 0 && !(down && down.mode === 'furn')) setHint(''); }, 1500); }
     else { const now = performance.now(); tagFor = null; if (lastTap.b === 'sky' && now - lastTap.t < 400) { follow = null; goHome = true; lastTap = { t: 0, b: null }; } else lastTap = { t: now, b: 'sky' }; }
   }
 }
@@ -167,8 +168,11 @@ canvas.addEventListener('wheel', (e) => {
   else { V.cy -= e.deltaY / V.s; V.cx += e.deltaX / V.s; clampCam(); }
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
+  if (!$('photoView').hidden) { if (e.key === 'Escape') closePhoto(); return; }
   if (!$('diary').hidden) { if (e.key === 'Escape') closeDiary(); else if (e.key === 'ArrowRight') turnPage(1); else if (e.key === 'ArrowLeft') turnPage(-1); return; }
-  if (e.key === 'Escape') { setArmed(-1); setCam(false); }
+  if (!$('photoView').hidden) { if (e.key === 'Escape') closePhoto(); return; }
+  if (!$('baoCard').hidden) { if (e.key === 'Escape') closeCard(); return; }
+  if (e.key === 'Escape') setArmed(-1);
   const k = { ArrowUp: [0, 60], ArrowDown: [0, -60], ArrowLeft: [-60, 0], ArrowRight: [60, 0] }[e.key];
   if (k) { stopFollow(); V.cx += k[0] / V.s; V.cy += k[1] / V.s; clampCam(); }
   if (e.key === '+' || e.key === '=') zoomAt(V.vw / 2, V.vh / 2, 1.15); if (e.key === '-') zoomAt(V.vw / 2, V.vh / 2, 1 / 1.15);
@@ -184,20 +188,22 @@ function drawTray() {
   });
   // one new bao a day
   const sep = document.createElement('div'); sep.className = 'sep'; box.appendChild(sep);
-  const spec = nextAdded(S), free = spec && !S.tray.bao.used, el = document.createElement('div');
+  const spec = todaysBao(), free = spec && !S.tray.bao.used, el = document.createElement('div');
   el.className = 'slot bao' + (free ? '' : ' used') + (armed === BAO_SLOT ? ' armed' : '');
   if (free) { const cv = document.createElement('canvas'); baoIcon(cv, spec); el.appendChild(cv); el.title = spec.name + ' would like to move in'; el.addEventListener('pointerdown', (e) => trayDown(e, BAO_SLOT, el)); }
   box.appendChild(el);
   trayNoteAt = 0; updateTrayNote();
 }
 const BAO_SLOT = 3;
+// Today's newcomer, with any name or colour the visitor has already picked.
+function todaysBao() { const base = nextAdded(S); return base && { ...base, ...(S.tray.bao.pick || {}) }; }
 function baoIcon(canvas, spec) {
   const dpr = Math.min(3, window.devicePixelRatio || 1), s = 52;
   canvas.width = s * dpr; canvas.height = s * dpr; canvas.style.width = canvas.style.height = s + 'px';
   const c = canvas.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.lineJoin = 'round';
   c.translate(s / 2, s * 0.8); c.scale(0.9, 0.9); drawBaoShape(c, { flavor: spec.flavor, acc: spec.acc, expr: 'joy' }, 0);
 }
-const trayAllUsed = () => S.tray.items.every((i) => i.used) && (S.tray.bao.used || !nextAdded(S));
+const trayAllUsed = () => S.tray.items.every((i) => i.used) && (S.tray.bao.used || !todaysBao());
 // Under the tray: once today's things are used, count down to midnight (the visitor's own clock).
 let trayNoteAt = 0;
 function updateTrayNote() {
@@ -212,8 +218,10 @@ function updateTrayNote() {
 }
 function useTray(i, x, h) {
   if (i === BAO_SLOT) {
-    if (S.tray.bao.used) return; const b = dropBao(x, Math.max(h, minFloor(S) * FH) + 2); if (!b) return;
-    S.tray.bao.used = true; snd.play('whoosh'); setArmed(-1); showTag(b); save(); return;
+    if (S.tray.bao.used) return; const chosen = !!S.tray.bao.met, b = dropBao(x, Math.max(h, minFloor(S) * FH) + 2, S.tray.bao.pick); if (!b) return;
+    S.tray.bao.used = true; snd.play('whoosh'); setArmed(-1); showTag(b); save();
+    if (!chosen) setTimeout(() => openCard('welcome', b), 1300); // dragged straight in: say hello once it has landed
+    return;
   }
   const it = S.tray.items[i]; if (!it || it.used) return;
   dropThing(it.type, x, Math.max(h, minFloor(S) * FH) + 2); snd.play('whoosh'); it.used = true; setArmed(-1); save();
@@ -222,35 +230,147 @@ function trayDown(e, i, el) {
   e.preventDefault(); snd.unlock(); el.setPointerCapture(e.pointerId);
   const sx = e.clientX, sy = e.clientY; let ghost = null, moved = false;
   const mv = (ev) => {
-    if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { moved = true; ghost = document.createElement('canvas'); ghost.id = 'ghost'; if (i === BAO_SLOT) baoIcon(ghost, nextAdded(S)); else thingIcon(ghost, S.tray.items[i].type); document.body.appendChild(ghost); el.style.opacity = 0.3; }
+    if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) { moved = true; ghost = document.createElement('canvas'); ghost.id = 'ghost'; if (i === BAO_SLOT) baoIcon(ghost, todaysBao()); else thingIcon(ghost, S.tray.items[i].type); document.body.appendChild(ghost); el.style.opacity = 0.3; }
     if (ghost) { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; }
   };
   const up = (ev) => {
     el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
     if (ghost) ghost.remove(); el.style.opacity = 1;
     if (ev.type === 'pointercancel') return;
-    if (!moved) { snd.play('tick'); setArmed(armed === i ? -1 : i); }
+    if (!moved) { snd.play('tick'); if (i === BAO_SLOT && armed !== i) openCard('meet'); else setArmed(armed === i ? -1 : i); }
     else if (ev.clientY < $('bar').getBoundingClientRect().top + 10) { const p = toWorld(ev.clientX, ev.clientY); useTray(i, p.x, p.h); }
   };
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 }
 
-$('bCam').addEventListener('click', () => { snd.unlock(); snd.play('tick'); setArmed(-1); setCam(!camOn); });
-// A photo is a fresh little render of the scene around a point, so it comes out the same wherever the view is.
-const PW = 240, PH = 180, photoCanvas = document.createElement('canvas');
+$('bCam').addEventListener('click', () => { snd.unlock(); setArmed(-1); takeShot(); });
+// ---------- photos ----------
+// The camera keeps exactly what is on screen. The save holds a small preview; the full photo goes in IndexedDB.
+const thumbCanvas = document.createElement('canvas'), fullCanvas = document.createElement('canvas');
+function makeThumb(src, sx, sy, sw, sh) {
+  thumbCanvas.width = 240; thumbCanvas.height = 180; const pc = thumbCanvas.getContext('2d');
+  pc.drawImage(src, sx, sy, sw, sh, 0, 0, 240, 180);
+  const g = pc.createRadialGradient(120, 90, 81, 120, 90, 168); g.addColorStop(0, 'rgba(255,240,210,0)'); g.addColorStop(1, 'rgba(120,80,40,.28)'); pc.fillStyle = g; pc.fillRect(0, 0, 240, 180);
+  return thumbCanvas.toDataURL('image/jpeg', 0.72);
+}
+function makeFull(src) {
+  const k = Math.min(1, 1280 / Math.max(src.width, src.height)); fullCanvas.width = Math.round(src.width * k); fullCanvas.height = Math.round(src.height * k);
+  fullCanvas.getContext('2d').drawImage(src, 0, 0, fullCanvas.width, fullCanvas.height);
+  return fullCanvas.toDataURL('image/jpeg', 0.82);
+}
+function keepPhoto(thumb, full, w, h) {
+  const p = { id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 99), t: clock.t, day: dayKey(clock.t), d: thumb, w, h };
+  (S.photos = S.photos || []).push(p); putFull(p.id, full);
+  while (S.photos.length > 24) delFull(S.photos.shift().id);
+  return p;
+}
+function takeShot() {
+  let thumb, full; const cw = canvas.width, ch = canvas.height, sceneH = Math.min(ch, V.gy * V.dpr + 20 * V.dpr);
+  // preview: the middle of the scene, landscape
+  const tw = Math.min(cw, sceneH * 4 / 3), th = tw * 3 / 4;
+  try { thumb = makeThumb(canvas, (cw - tw) / 2, Math.max(0, (sceneH - th) / 2), tw, th); full = makeFull(canvas); } catch (e) { return; }
+  keepPhoto(thumb, full, fullCanvas.width, fullCanvas.height);
+  R.flash = 1; snd.play('shutter');
+  const mid = toWorld(V.vw / 2, V.gy * 0.55); notePhoto(mid.x, clamp(Math.floor((mid.h + 6) / FH), S.basement ? -1 : 0, nFloors(S)), false);
+  setHint('saved in the diary'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (armed < 0) setHint(''); }, 1600);
+  save();
+}
+// The party photo is taken off-screen, around the party, wherever the view happens to be.
+const offCanvas = document.createElement('canvas');
 function takePhoto(x, h, auto) {
-  const f = Math.max(Math.floor((h + 6) / FH), S.basement ? -1 : 0), centreH = Math.min(h, f * FH + 70), s = 1.55;
-  const Vp = { vw: PW, vh: PH, dpr: 1, s, cx: x, cy: centreH, gy: PH / 2, wx0: x - PW / 2 / s, wx1: x + PW / 2 / s };
-  photoCanvas.width = PW; photoCanvas.height = PH;
-  const flash = R.flash; R.flash = 0; render(photoCanvas.getContext('2d'), Vp, S, performance.now() / 1000); R.flash = flash;
-  const pc = photoCanvas.getContext('2d'); pc.setTransform(1, 0, 0, 1, 0, 0);
-  const g = pc.createRadialGradient(PW / 2, PH / 2, PH * 0.45, PW / 2, PH / 2, PW * 0.7); g.addColorStop(0, 'rgba(255,240,210,0)'); g.addColorStop(1, 'rgba(120,80,40,.28)'); pc.fillStyle = g; pc.fillRect(0, 0, PW, PH);
-  let d; try { d = photoCanvas.toDataURL('image/jpeg', 0.72); } catch (e) { return; }
-  (S.photos = S.photos || []).push({ id: 'p' + Date.now().toString(36), t: clock.t, day: dayKey(clock.t), d });
-  if (S.photos.length > 24) S.photos.splice(0, S.photos.length - 24);
+  const f = Math.max(Math.floor((h + 6) / FH), S.basement ? -1 : 0), centreH = Math.min(h, f * FH + 70), W2 = 1024, H2 = 768, s = 2.4;
+  const Vp = { vw: W2, vh: H2, dpr: 1, s, cx: x, cy: centreH, gy: H2 / 2, wx0: x - W2 / 2 / s, wx1: x + W2 / 2 / s };
+  offCanvas.width = W2; offCanvas.height = H2;
+  const flash = R.flash; R.flash = 0; render(offCanvas.getContext('2d'), Vp, S, performance.now() / 1000); R.flash = flash;
+  let thumb, full; try { thumb = makeThumb(offCanvas, 0, 0, W2, H2); full = offCanvas.toDataURL('image/jpeg', 0.82); } catch (e) { return; }
+  keepPhoto(thumb, full, W2, H2);
   if (!auto) { R.flash = 1; snd.play('shutter'); }
   notePhoto(x, clamp(f, S.basement ? -1 : 0, nFloors(S)), auto); save();
 }
+// Full-screen viewer, with delete.
+let viewing = null;
+async function openPhoto(id) {
+  const p = (S.photos || []).find((q) => q.id === id); if (!p) return;
+  viewing = p; const img = $('pvImg'); img.src = p.d; img.style.transform = '';
+  const d = new Date(p.t); $('pvWhen').textContent = dayLabel(p.day) + ', ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  $('pvDel').textContent = 'delete'; $('pvDel').classList.remove('sure'); $('photoView').hidden = false; viewing.at = performance.now(); snd.play('page');
+  const full = await getFull(id); if (full && viewing === p) img.src = full;
+}
+function closePhoto() { $('photoView').hidden = true; viewing = null; }
+$('pvClose').addEventListener('click', closePhoto);
+$('photoView').addEventListener('click', (e) => { if (e.target === $('photoView') && viewing && performance.now() - viewing.at > 450) closePhoto(); });
+$('pvDel').addEventListener('click', () => {
+  const btn = $('pvDel'); if (!btn.classList.contains('sure')) { btn.classList.add('sure'); btn.textContent = 'really delete?'; return; }
+  const p = viewing; if (!p) return; S.photos.splice(S.photos.indexOf(p), 1); delFull(p.id); save(); closePhoto(); snd.play('blip');
+  if (!$('diary').hidden) openDiary(bookPage());
+});
+swipeToClose($('photoView'), $('pvImg'), closePhoto);
+// Pull something down far enough and it closes.
+function swipeToClose(area, mover, close, busy = () => false) {
+  let s = null;
+  area.addEventListener('pointerdown', (e) => { if (e.target.closest('button, a, input')) return; s = { x: e.clientX, y: e.clientY, id: e.pointerId, t: performance.now(), on: false }; });
+  area.addEventListener('pointermove', (e) => {
+    if (!s || s.id !== e.pointerId) return; const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    if (!s.on) { if (busy() || dy < 12 || dy < Math.abs(dx) * 1.3) return; s.on = true; try { area.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } mover.style.transition = 'none'; }
+    mover.style.transform = `translateY(${Math.max(0, dy)}px)`;
+  });
+  const end = (e) => {
+    if (!s || s.id !== e.pointerId) { s = null; return; } const g = s; s = null; if (!g.on) return;
+    const dy = e.clientY - g.y, fast = dy > 50 && performance.now() - g.t < 250; mover.style.transition = '';
+    if (dy > 120 || fast) { mover.style.transform = 'translateY(110vh)'; setTimeout(() => { close(); mover.style.transform = ''; }, 230); }
+    else mover.style.transform = '';
+  };
+  area.addEventListener('pointerup', end); area.addEventListener('pointercancel', end);
+}
+// ---------- meeting, naming and colouring a bao ----------
+const SWATCHES = ['plain', 'custard', 'peach', 'rosy', 'taro', 'sky', 'mint', 'matcha', 'wheat', 'sesame'];
+const ABOUT = { tidy: 'likes everything just so', lazy: 'is an expert napper', nosy: 'wants to know everything', mischief: 'is a bit of a scamp', doting: 'adores the baby',
+  sporty: 'never sits still', dreamy: 'watches the clouds a lot', hungry: 'is always a little peckish', musical: 'hums all day long', green: 'is happiest in the garden', elder: 'knits, and knows things', baby: 'is very small' };
+let card = null;
+function drawCardPic() {
+  const cv = $('bcPic'), dpr = Math.min(3, window.devicePixelRatio || 1); cv.width = 160 * dpr; cv.height = 140 * dpr;
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.lineJoin = 'round'; c.clearRect(0, 0, 160, 140);
+  c.translate(80, 128); c.scale(2.3, 2.3); drawBaoShape(c, { flavor: card.flavor, acc: card.acc, expr: 'joy', size: card.size || 1 }, 0);
+}
+function openCard(mode, b) {
+  const spec = mode === 'meet' ? todaysBao() : b; if (!spec) return;
+  card = { mode, b, flavor: spec.flavor, acc: spec.acc, size: b && b.size, orig: spec.name, trait: spec.trait, from: spec.from };
+  $('bcTitle').textContent = mode === 'meet' ? `Meet ${spec.name}!` : mode === 'welcome' ? `Welcome, ${spec.name}!` : spec.name;
+  const where = mode === 'meet' ? ` ${spec.name} would like to move in today.` : b && b.arrived ? ` Here since ${dayLabel(dayKey(b.arrived)).replace(/^(Today|Yesterday)$/, (m) => m.toLowerCase())}.` : '';
+  $('bcAbout').textContent = `${spec.name} ${ABOUT[spec.trait] || 'is lovely'}.${where}`;
+  $('bcName').value = spec.name; $('bcErr').textContent = '';
+  $('bcOk').textContent = mode === 'meet' ? `bring ${spec.name} in` : 'done';
+  $('bcCancel').textContent = mode === 'meet' ? 'not now' : 'cancel'; $('bcCancel').hidden = mode === 'welcome';
+  const sw = $('bcSwatches'); sw.innerHTML = '';
+  for (const k of SWATCHES) { const btn = document.createElement('button'); btn.style.background = FLAVORS[k].fill; btn.title = k; btn.setAttribute('role', 'radio');
+    if (k === 'sesame') btn.style.backgroundImage = 'radial-gradient(#3a2a22 1.2px, transparent 1.6px)', btn.style.backgroundSize = '7px 7px';
+    btn.className = k === card.flavor ? 'on' : ''; btn.setAttribute('aria-checked', String(k === card.flavor));
+    btn.addEventListener('click', () => { card.flavor = k; for (const q of sw.children) { q.classList.toggle('on', q === btn); q.setAttribute('aria-checked', String(q === btn)); } drawCardPic(); snd.play('tick'); });
+    sw.appendChild(btn); }
+  drawCardPic(); $('baoCard').hidden = false; card.at = performance.now(); snd.unlock(); snd.play('pet');
+}
+function closeCard() { $('baoCard').hidden = true; card = null; }
+function cardName() {
+  const name = $('bcName').value.replace(/\s+/g, ' ').trim();
+  if (!name) return [null, 'Every bao needs a name.'];
+  if (name.length > 14) return [null, 'That name is a bit long.'];
+  const taken = [...S.everNames, ...(S.usedAdded || [])].some((n) => n.toLowerCase() === name.toLowerCase() && n !== card.orig);
+  if (taken) return [null, `There is already a ${name}.`];
+  return [name, ''];
+}
+$('bcOk').addEventListener('click', () => {
+  const [name, err] = cardName(); if (err) { $('bcErr').textContent = err; snd.play('blip'); return; }
+  if (card.mode === 'meet') {
+    S.tray.bao.pick = { name, flavor: card.flavor }; S.tray.bao.met = true; closeCard(); drawTray(); setArmed(BAO_SLOT); save(); return;
+  }
+  if (card.b && S.baos.includes(card.b)) { renameBao(card.b, name, card.flavor); card.b.joyT = 2; card.b.squash = 0.2; }
+  closeCard(); snd.play('pet'); save();
+});
+$('bcCancel').addEventListener('click', closeCard);
+// a phone sends a late click after the tap that opened the card: ignore background taps for a moment
+$('baoCard').addEventListener('click', (e) => { if (e.target === $('baoCard') && card && card.mode !== 'welcome' && performance.now() - card.at > 450) closeCard(); });
+$('bcName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('bcOk').click(); e.stopPropagation(); });
+$('tag').addEventListener('click', (e) => { if (e.target.closest('.edit') && tagFor) openCard('edit', tagFor); });
 // ---------- music ----------
 function drawMusicBtn() { const on = music.isOn(); $('bMusic').innerHTML = `<svg viewBox="0 0 24 24"><path d="M9 17V6l10-2v11" fill="none"/><circle cx="6.5" cy="17.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/><circle cx="16.5" cy="15.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/>${on ? '' : '<path d="M4 4l16 16" stroke="#E8604C"/>'}</svg>`;
   $('bMusic').classList.toggle('on', on); $('bMusic').title = on ? 'Music is on' : 'Music is off'; $('bMusic').setAttribute('aria-pressed', String(on)); }
@@ -265,7 +385,7 @@ function dayLabel(key) {
   const [Y, M, D] = key.split('-').map(Number);
   return new Date(Y, M - 1, D).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 }
-function openDiary() {
+function openDiary(at) {
   const who = S.baos.find((b) => b.id === S.diarist);
   $('diaryTitle').textContent = who ? `${who.name}’s diary` : 'The diary';
   // everyone who might be mentioned: residents in their own colour, old friends in a quiet brown
@@ -273,17 +393,19 @@ function openDiary() {
   for (const n of S.everNames || []) if (!people.some((p) => p.name === n)) people.push({ name: n, id: null, color: '#8a7a72' });
   people.sort((a, b) => b.name.length - a.name.length);
   $('diary').hidden = false;
-  openBook({ host: $('bookPages'), nav: $('bookNav'), entries: S.diary.slice(-400), photos: S.photos || [], people, dayLabel,
+  openBook({ host: $('bookPages'), nav: $('bookNav'), entries: S.diary.slice(-400), photos: S.photos || [], people, dayLabel, at: typeof at === 'number' ? at : null,
+    onPhoto: (id) => openPhoto(id),
     onTurn: () => snd.play('page'),
     onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } } });
   snd.unlock(); snd.play('page');
 }
 function closeDiary() { $('diary').hidden = true; closeBook(); }
 attachBookInput($('bookPages'));
-$('bDiary').addEventListener('click', openDiary);
+$('bDiary').addEventListener('click', () => openDiary());
+swipeToClose($('diary'), document.querySelector('#diary .book'), () => closeDiary(), bookBusy);
 $('diaryClose').addEventListener('click', closeDiary);
 $('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) closeDiary(); });
-window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(); });
+window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(bookPage()); });
 $('exportBtn').addEventListener('click', (e) => { e.preventDefault(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([serialize()], { type: 'application/json' })); a.download = `tinybao-community-${dayKey(clock.t)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
 $('importBtn').addEventListener('click', (e) => { e.preventDefault(); $('importFile').click(); });
 $('importFile').addEventListener('change', async (e) => {
@@ -345,13 +467,14 @@ function frame(now) {
   else if (gap > 0) { const n = Math.min(240, Math.ceil(gap / 100)), dt = gap / n / 1000; for (let i = 0; i < n; i++) { clock.t += dt * 1000; tick(dt); } }
   tickParts(real); updateTrayNote(); stepCamera(real);
   // furniture lifts after a short press, so an ordinary drag still pans the view
-  if (down && !down.mode && !down.moved && down.t && down.t.furn && !camOn && armed < 0 && now - down.at > 380) { down.mode = 'furn'; liftFurn(down.t.furn); snd.play('pick'); setHint('drop it in any room'); canvas.style.cursor = 'grabbing'; }
+  if (down && !down.mode && !down.moved && down.t && down.t.furn && armed < 0 && now - down.at > 380) { down.mode = 'furn'; liftFurn(down.t.furn); snd.play('pick'); setHint('drop it in any room'); canvas.style.cursor = 'grabbing'; }
   render(ctx, V, S, now / 1000);
   const tag = $('tag');
-  if (tagFor && now < tagUntil && S.baos.includes(tagFor) && !tagFor.held) {
+  if (follow && !tagFor) tagFor = follow;
+  if (tagFor && (now < tagUntil || tagFor === follow) && S.baos.includes(tagFor) && !tagFor.held) {
     const p = toScreen(tagFor.x, tagFor.floor * FH + tagFor.alt + BAO * 0.84 * (tagFor.size || 1) + 16);
     tag.hidden = false; tag.style.left = clamp(p.x, 70, V.vw - 70) + 'px'; tag.style.top = Math.max(30, p.y) + 'px';
-    const txt = `${tagFor.name} <small>· ${tagFor.label}</small>`; if (tag.dataset.t !== txt) { tag.innerHTML = txt; tag.dataset.t = txt; }
+    const txt = `${esc(tagFor.name)} <small>· ${esc(tagFor.label)}</small><button class="edit" title="Rename or recolour" aria-label="Rename or recolour ${esc(tagFor.name)}">✎</button>`; if (tag.dataset.t !== txt) { tag.innerHTML = txt; tag.dataset.t = txt; }
   } else tag.hidden = true;
   requestAnimationFrame(frame);
 }
@@ -382,7 +505,7 @@ function boot() {
   setInterval(save, 8000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
-  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, music, VERSION, takePhoto, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
+  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, music, VERSION, takePhoto, takeShot, getFull, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
   requestAnimationFrame(frame);
 }
 boot();

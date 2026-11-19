@@ -6,7 +6,7 @@
 // back of the sheet shows Q reflected across the fold. A finished turn lands the sheet on the
 // other side of the spine.
 
-const INK = { plain: '#A0712F', custard: '#B07F06', taro: '#8357B0', matcha: '#4F8A2A', rosy: '#CC4D72', wheat: '#9A5F25', sesame: '#4A3A33' };
+const INK = { plain: '#A0712F', custard: '#B07F06', taro: '#8357B0', matcha: '#4F8A2A', rosy: '#CC4D72', wheat: '#9A5F25', sesame: '#4A3A33', peach: '#C9672A', sky: '#3D7DB3', mint: '#2E8C6A' };
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let B = null; // the open book
@@ -49,7 +49,7 @@ function paginate(o, pw, ph) {
   // photographs at the back, four to a page
   const ph4 = o.photos.slice().reverse();
   for (let i = 0; i < ph4.length; i += 4) {
-    pages.push({ html: `<h3>Photographs</h3><div class="photos">${ph4.slice(i, i + 4).map((p) => `<figure><img src="${p.d}" alt=""><figcaption>${esc(o.dayLabel(p.day))}</figcaption></figure>`).join('')}</div>`, photos: true });
+    pages.push({ html: `<h3>Photographs</h3><div class="photos">${ph4.slice(i, i + 4).map((p) => `<figure data-photo="${p.id}" role="button" tabindex="0"><img src="${p.d}" alt=""><figcaption>${esc(o.dayLabel(p.day))}</figcaption></figure>`).join('')}</div>`, photos: true });
   }
   measure.remove();
   pages.forEach((p, i) => { p.no = i + 1; });
@@ -158,11 +158,14 @@ export function openBook(opts) {
   const layer = document.createElement('div'); layer.className = 'layer'; host.style.width = (spread ? pw * 2 : pw) + 'px'; host.style.height = ph + 'px'; host.appendChild(layer);
   B = { host, layer, pw, ph, spread, opts, nav: opts.nav, T: null, anim: false };
   const { pages, lastText } = paginate({ ...opts, host }, pw, ph);
-  B.pages = pages; B.i = spread ? lastText - (lastText % 2) : lastText;
+  const at = opts.at != null ? Math.min(opts.at, pages.length - 1) : lastText;
+  B.pages = pages; B.i = spread ? at - (at % 2) : at;
   host.classList.toggle('spread', spread);
   layoutStatic();
 }
 export const bookOpen = () => !!B;
+export const bookPage = () => (B ? B.i : null);
+export const bookBusy = () => !!(B && (B.T || B.anim));
 export function closeBook() { B = null; }
 
 // ---------- dragging ----------
@@ -192,9 +195,11 @@ export function attachBookInput(host) {
       const T = B.T, prog = Math.abs(T.P.x - T.from.x) / Math.abs(T.to.x - T.from.x), flick = performance.now() - g.t0 < 260 && Math.abs(g.lastDx || 0) > 30;
       const done = prog > 0.5 || flick; animateTo(done ? T.to : T.from, () => finish(done)); return;
     }
-    if (e.type !== 'pointerup') return;
+    if (e.type !== 'pointerup' || Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 10) return;
     const name = e.target.closest && e.target.closest('.nm.live');
     if (name) { B.opts.onName(name.dataset.id); return; }
+    const fig = e.target.closest && e.target.closest('figure[data-photo]');
+    if (fig) { B.opts.onPhoto(fig.dataset.photo); return; }
     const w = host.clientWidth;
     if (g.rx > w * 0.78) turn(1); else if (g.rx < w * 0.22) turn(-1);
   };

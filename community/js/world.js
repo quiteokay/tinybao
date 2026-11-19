@@ -167,7 +167,7 @@ export const ADDED = ADD_NAMES.map((name, i) => ({ name, flavor: ADD_FLAVORS[i %
 export const MAX_BAOS = 60;
 export function nextAdded(S) {
   if (S.baos.length >= MAX_BAOS) return null;
-  const used = new Set(S.everNames), ready = ADDED.find((n) => !used.has(n.name)); if (ready) return ready;
+  const used = new Set([...S.everNames, ...(S.usedAdded || [])]), ready = ADDED.find((n) => !used.has(n.name)); if (ready) return ready;
   // past the first thirty: make one up, the same one each time until it is used
   const rnd = seeded(hashStr('extra:' + S.everNames.length)), A = ['Mi', 'Po', 'Tu', 'La', 'Ki', 'Bo', 'Nu', 'Zi', 'Pa', 'Mo', 'Lu', 'Shu'], B = ['mo', 'ki', 'bun', 'li', 'ro', 'pa', 'chi', 'do', 'mi', 'nu'];
   let name; for (let i = 0; i < 40; i++) { name = A[Math.floor(rnd() * A.length)] + B[Math.floor(rnd() * B.length)]; if (!used.has(name)) break; name += ' ' + (S.everNames.length + 1); }
