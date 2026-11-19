@@ -15,7 +15,7 @@ import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 8; // keep in step with version.json
+const VERSION = 9; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
@@ -444,6 +444,10 @@ async function openDiary(at, span, fromEnd) {
   people.sort((a, b) => b.name.length - a.name.length);
   openBook({ host: $('bookPages'), nav: $('bookNav'), entries, hasEarlier, photos: S.photos || [], people, dayLabel, at: typeof at === 'number' ? at : null, fromEnd,
     onEarlier: () => openDiary(null, span + 240, bookCount()),
+    backCover: `<div class="about"><h3>About this diary</h3><p>It lives in this browser only, so it stays private to you and your baos.</p>
+      <button data-act="update">check for updates</button><button data-act="export">keep a copy</button><button data-act="import">restore a copy</button><small>swipe left to close the book</small></div>`,
+    onAct: (a, el) => { if (a === 'update') checkForUpdates(el); if (a === 'export') exportCopy(); if (a === 'import') $('importFile').click(); },
+    onClose: () => closeDiary(),
     onPhoto: (id) => openPhoto(id),
     onTurn: () => snd.play('page'),
     onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } } });
@@ -468,12 +472,10 @@ let typed = '';
 window.addEventListener('keydown', (e) => { if (e.key.length !== 1 || (e.target.closest && e.target.closest('input'))) return; typed = (typed + e.key.toLowerCase()).slice(-4); if (typed === 'shop' && zoomedOut()) { typed = ''; openDoor(shopApi); } });
 $('bDiary').addEventListener('click', () => { if (!swallowed()) openDiary(); });
 swipeToClose($('diary'), document.querySelector('#diary .book'), () => closeDiary(), bookBusy);
-$('diaryClose').addEventListener('click', closeDiary);
 $('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) closeDiary(); });
 window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(bookPage(), diarySpan); });
-$('exportBtn').addEventListener('click', async (e) => { e.preventDefault(); const data = JSON.parse(serialize()); data.diary = (await allDays()).concat(data.diary); // the whole diary goes in the copy
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })); a.download = `tinybao-community-${dayKey(clock.t)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
-$('importBtn').addEventListener('click', (e) => { e.preventDefault(); $('importFile').click(); });
+async function exportCopy() { const data = JSON.parse(serialize()); data.diary = (await allDays()).concat(data.diary); // the whole diary goes in the copy
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })); a.download = `tinybao-community-${dayKey(clock.t)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 $('importFile').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
   try { const d = JSON.parse(await f.text()); if (!Array.isArray(d.floors) || !Array.isArray(d.baos)) throw 0;
@@ -485,8 +487,8 @@ $('importFile').addEventListener('change', async (e) => {
 // ---------- updates ----------
 // Home-screen apps hang on to old files, so this fetches the latest ones on request and says what changed.
 const notesSince = (info, v) => info.changes.filter((c) => c.v > v).flatMap((c) => c.notes);
-async function checkForUpdates() {
-  const link = $('updateBtn'); link.textContent = 'checking…';
+async function checkForUpdates(link) {
+  link = link || { set textContent(v) {} }; link.textContent = 'checking…';
   let info;
   try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw 0; info = await r.json(); }
   catch (e) { link.textContent = 'check for updates'; closeDiary(); showCard('Could not check', ['The baos could not reach the outside world just now. Try again when you are online.'], false); return; }
@@ -508,7 +510,6 @@ async function announceUpdate() {
   try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); notes = notesSince(await r.json(), +from); } catch (e) { /* show the card without the list */ }
   showCard('Updated!', ['The community has had some work done:'].concat(notes.map((n) => '• ' + n)), false);
 }
-$('updateBtn').addEventListener('click', (e) => { e.preventDefault(); checkForUpdates(); });
 
 function showCard(title, lines, withDiary) {
   $('cardTitle').textContent = title; const body = $('cardBody'); body.innerHTML = '';

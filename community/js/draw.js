@@ -30,6 +30,34 @@ function cloud(c, x, y, s, col) {
   c.fill(); c.beginPath(); c.roundRect(x - 42 * s, y, 80 * s, 16 * s, 8 * s); c.fill();
 }
 
+// Rain and snow. Each drop and flake has its own random place, speed, size and timing (none of them
+// share a rhythm), so they never fall into step. Raindrops end in a little splash on the grass.
+const rr = seeded(4242);
+const DROPS = Array.from({ length: 130 }, () => ({ x: rr(), ph: rr(), v: 430 + rr() * 330, len: 8 + rr() * 9, slant: 0.12 + rr() * 0.16, land: rr(), a: 0.35 + rr() * 0.4, w: 1.1 + rr() * 0.8 }));
+const FLAKES = Array.from({ length: 95 }, () => ({ x: rr(), ph: rr(), v: 18 + rr() * 30, r: 1.1 + rr() * 2.3, sw: 6 + rr() * 16, sf: 0.4 + rr() * 0.9, sp: rr() * 7, a: 0.65 + rr() * 0.35 }));
+function drawRain(c, V, t, d) {
+  const ground = V.gy + V.cy * V.s, col = d > 0.5 ? '210,230,255' : '90,130,190', gust = Math.sin(t * 0.23) * 10 + Math.sin(t * 0.61 + 1) * 5;
+  c.lineCap = 'round';
+  for (const k of DROPS) {
+    const landY = Math.max(ground + 4, V.vh * 0.25) + k.land * Math.max(20, V.vh - ground), span = landY + 40, fall = span / k.v;
+    const u = ((t / fall + k.ph) % 1), y = u * span - 40, x = ((k.x * (V.vw + 80) + gust - (y + 40) * k.slant) % (V.vw + 80) + V.vw + 80) % (V.vw + 80) - 40;
+    const left = (1 - u) * fall; // seconds until it lands
+    if (left < 0.16 && landY < V.vh + 10) { // splash
+      const s = 1 - left / 0.16; c.strokeStyle = `rgba(${col},${0.5 * (1 - s)})`; c.lineWidth = 1;
+      c.beginPath(); c.ellipse(x, landY, 2 + s * 7, 1 + s * 2, 0, Math.PI, 0); c.stroke();
+      c.fillStyle = `rgba(${col},${0.6 * (1 - s)})`; for (const dx of [-1, 1]) { c.beginPath(); c.arc(x + dx * (2 + s * 6), landY - Math.sin(s * Math.PI) * 6, 1, 0, 7); c.fill(); }
+      continue;
+    }
+    c.strokeStyle = `rgba(${col},${k.a})`; c.lineWidth = k.w;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x - k.len * k.slant, y + k.len); c.stroke();
+  }
+}
+function drawSnow(c, V, t) {
+  for (const k of FLAKES) {
+    const span = V.vh + 30, y = ((t * k.v / span + k.ph) % 1) * span - 15, x = ((k.x * (V.vw + 40) + Math.sin(t * k.sf + k.sp) * k.sw) % (V.vw + 40) + V.vw + 40) % (V.vw + 40) - 20;
+    c.fillStyle = `rgba(255,255,255,${k.a})`; c.beginPath(); c.arc(x, y, k.r, 0, 7); c.fill();
+  }
+}
 function drawSky(c, V, S, t, h, w) {
   const [top, bot] = skyAt(h, w), d = darkness(h);
   const g = c.createLinearGradient(0, 0, 0, V.vh); g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bot));
@@ -49,10 +77,8 @@ function drawSky(c, V, S, t, h, w) {
   const n = w === 'sun' ? 3 : w === 'cloud' ? 6 : 7, cc = mix(w === 'rain' || w === 'snow' ? [205, 212, 222] : [255, 255, 255], [70, 76, 120], d * 0.85);
   for (let i = 0; i < n; i++) { const cl = CLOUDS[i], x = ((cl.x + t * cl.v) % 1.3 - 0.15) * V.vw; c.globalAlpha = w === 'sun' ? 0.85 : 0.95; cloud(c, x, cl.y * V.vh + par, cl.s * (V.vw < 600 ? 0.75 : 1.1), rgb(cc)); }
   c.globalAlpha = 1;
-  if (w === 'rain') { c.strokeStyle = d > 0.5 ? 'rgba(210,230,255,.5)' : 'rgba(90,130,190,.5)'; c.lineWidth = 1.4; c.beginPath();
-    for (let i = 0; i < 110; i++) { const x = ((i * 137.5) % V.vw + t * 40) % V.vw, y = ((i * 71.3 + t * (520 + (i % 5) * 60)) % (V.vh + 40)) - 20; c.moveTo(x, y); c.lineTo(x - 3, y + 13); } c.stroke(); }
-  if (w === 'snow') { c.fillStyle = 'rgba(255,255,255,.9)';
-    for (let i = 0; i < 90; i++) { const y = ((i * 53.7 + t * (28 + (i % 4) * 9)) % (V.vh + 20)) - 10, x = ((i * 97.3) % V.vw + Math.sin(t * 0.8 + i) * 14 + V.vw) % V.vw; c.beginPath(); c.arc(x, y, 1.4 + (i % 3) * 0.7, 0, 7); c.fill(); } }
+  if (w === 'rain') drawRain(c, V, t, d);
+  if (w === 'snow') drawSnow(c, V, t);
 }
 
 function drawGround(c, V, S, t, d) {

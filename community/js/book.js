@@ -25,6 +25,7 @@ function paginate(o, pw, ph) {
   const measure = document.createElement('div'); measure.className = 'page measure'; measure.style.width = pw + 'px'; measure.style.height = ph + 'px';
   o.host.appendChild(measure);
   const pages = []; let cur = [];
+  // (the inside back cover is added at the very end)
   const fits = () => measure.scrollHeight <= measure.clientHeight + 1;
   const flush = () => { if (cur.length) pages.push({ html: cur.join('') }); cur = []; measure.innerHTML = ''; };
   const put = (html) => {
@@ -52,6 +53,7 @@ function paginate(o, pw, ph) {
   for (let i = 0; i < ph4.length; i += 4) {
     pages.push({ html: `<h3>Photographs</h3><div class="photos">${ph4.slice(i, i + 4).map((p) => `<figure data-photo="${p.id}" role="button" tabindex="0"><img src="${p.d}" alt=""><figcaption>${esc(o.dayLabel(p.day))}</figcaption></figure>`).join('')}</div>`, photos: true });
   }
+  if (o.backCover) pages.push({ html: o.backCover, cls: 'endpaper', bare: true });
   measure.remove();
   pages.forEach((p, i) => { p.no = i + 1; });
   return { pages, lastText };
@@ -77,11 +79,12 @@ function el(cls, html, x) {
   const d = document.createElement('div'); d.className = 'page ' + cls; d.style.width = B.pw + 'px'; d.style.height = B.ph + 'px'; d.style.left = x + 'px';
   d.innerHTML = html == null ? '' : html; return d;
 }
-const pageHtml = (i) => (i >= 0 && i < B.pages.length ? B.pages[i].html + `<div class="pno">${i + 1}</div>` : null);
+const pageHtml = (i) => (i >= 0 && i < B.pages.length ? B.pages[i].html + (B.pages[i].bare ? '' : `<div class="pno">${i + 1}</div>`) : null);
+const pageCls = (i) => (i >= 0 && i < B.pages.length && B.pages[i].cls) || '';
 function layoutStatic() {
   const L = B.layer; L.innerHTML = '';
-  if (B.spread) { L.appendChild(el('pg-left', pageHtml(B.i) ?? '', 0)); L.appendChild(el('pg-right', pageHtml(B.i + 1) ?? '', B.pw)); }
-  else L.appendChild(el('', pageHtml(B.i) ?? '', 0));
+  if (B.spread) { L.appendChild(el('pg-left ' + pageCls(B.i), pageHtml(B.i) ?? '', 0)); L.appendChild(el('pg-right ' + pageCls(B.i + 1), pageHtml(B.i + 1) ?? '', B.pw)); }
+  else L.appendChild(el(pageCls(B.i), pageHtml(B.i) ?? '', 0));
   B.nav.textContent = B.spread && B.i + 1 < B.pages.length ? `${B.i + 1}–${B.i + 2} of ${B.pages.length}` : `${B.i + 1} of ${B.pages.length}`;
 }
 // Set up the elements for a turn in direction dir (+1 forward, -1 back).
@@ -155,7 +158,9 @@ export function turn(dir) {
 export function openBook(opts) {
   const host = opts.host; host.innerHTML = '';
   const vw = window.innerWidth, vh = window.innerHeight, spread = vw >= 820;
-  const pw = Math.floor(spread ? Math.min(400, (vw - 70) / 2) : Math.min(500, vw - 18)), ph = Math.floor(Math.min(vh * 0.86, 780) - 106);
+  const pw = Math.floor(spread ? Math.min(400, (vw - 80) / 2) : Math.min(500, vw - 26));
+  // the writing area is a whole number of ruled lines, so no line is ever cut off at the bottom
+  const lines = Math.max(6, Math.floor((Math.min(vh * 0.86, 780) - 118 - 58) / 30)), ph = lines * 30 + 58;
   const layer = document.createElement('div'); layer.className = 'layer'; host.style.width = (spread ? pw * 2 : pw) + 'px'; host.style.height = ph + 'px'; host.appendChild(layer);
   B = { host, layer, pw, ph, spread, opts, nav: opts.nav, T: null, anim: false };
   const { pages, lastText } = paginate({ ...opts, host }, pw, ph);
@@ -182,9 +187,11 @@ export function attachBookInput(host) {
     const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
     if (!d.turning) {
       if (Math.abs(dx) < 7 || Math.abs(dx) < Math.abs(dy)) return;
-      if (!beginTurn(dx < 0 ? 1 : -1, d.ry < B.ph / 2 ? 0 : B.ph)) { d = null; return; }
-      d.turning = true; host.setPointerCapture(e.pointerId);
+      if (!beginTurn(dx < 0 ? 1 : -1, d.ry < B.ph / 2 ? 0 : B.ph)) { if (dx < 0 && B.opts.onClose) { d.closing = true; host.setPointerCapture(e.pointerId); } else { d = null; return; } }
+      else d.turning = true;
+      if (d.turning) host.setPointerCapture(e.pointerId);
     }
+    if (d.closing) { B.layer.style.transform = `translateX(${Math.min(0, dx) * 0.35}px)`; d.lastDx = dx; return; }
     const T = B.T, k = B.spread ? 1 : 2, lo = Math.min(T.from.x, T.to.x), hi = Math.max(T.from.x, T.to.x);
     const px = Math.max(lo, Math.min(hi, T.from.x + dx * k)), prog = Math.abs(px - T.from.x) / (hi - lo);
     const curl = Math.sin(Math.PI * Math.min(1, prog * 1.6 + 0.02)) * B.ph * 0.16 * (T.cy === 0 ? 1 : -1) * (T.rev ? Math.sin(Math.PI * prog) : 1);
@@ -193,6 +200,7 @@ export function attachBookInput(host) {
   const up = (e) => {
     if (!d || d.id !== e.pointerId || !B) { d = null; return; }
     const g = d; d = null;
+    if (g.closing) { B.layer.style.transition = 'transform .2s'; B.layer.style.transform = ''; setTimeout(() => { if (B) B.layer.style.transition = ''; }, 220); if ((g.lastDx || 0) < -60) B.opts.onClose(); return; }
     if (g.turning && B.T) {
       const T = B.T, prog = Math.abs(T.P.x - T.from.x) / Math.abs(T.to.x - T.from.x), flick = performance.now() - g.t0 < 260 && Math.abs(g.lastDx || 0) > 30;
       const done = prog > 0.5 || flick; animateTo(done ? T.to : T.from, () => finish(done)); return;
@@ -201,6 +209,8 @@ export function attachBookInput(host) {
     if (e.target.closest && e.target.closest('.earlier')) { B.opts.onEarlier(); return; }
     const name = e.target.closest && e.target.closest('.nm.live');
     if (name) { B.opts.onName(name.dataset.id); return; }
+    const actBtn = e.target.closest && e.target.closest('[data-act]');
+    if (actBtn) { B.opts.onAct(actBtn.dataset.act, actBtn); return; }
     const fig = e.target.closest && e.target.closest('figure[data-photo]');
     if (fig) { B.opts.onPhoto(fig.dataset.photo); return; }
     const w = host.clientWidth;

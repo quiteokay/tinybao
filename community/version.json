@@ -1,5 +1,5 @@
 {
-  "v": 8,
+  "v": 9,
   "files": [
     "index.html",
     "style.css",
@@ -19,6 +19,13 @@
     "js/workshop.js"
   ],
   "changes": [
+    {
+      "v": 9,
+      "notes": [
+        "the diary is a proper little notebook now, with a cover and a ribbon",
+        "rain and snow fall more naturally, and the rain splashes"
+      ]
+    },
     {
       "v": 8,
       "notes": [

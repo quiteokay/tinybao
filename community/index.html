@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/lilbao_351.png">
   <link rel="icon" type="image/png" href="/lilbao_351.png">
   <title>tiny bao community</title>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
@@ -58,14 +58,12 @@
 
   <div id="diary" hidden>
     <div class="book">
-      <div class="bookHead"><h2 id="diaryTitle">Diary</h2><span id="bookNav"></span><button id="diaryClose" aria-label="Close">×</button></div>
-      <div id="bookPages"></div>
-      <div class="bookFoot">
-        <span>Saved in this browser only. <a href="#" id="updateBtn">check for updates</a></span>
-        <span><a href="#" id="exportBtn">keep a copy</a> · <a href="#" id="importBtn">restore a copy</a><input type="file" id="importFile" accept="application/json,.json" hidden></span>
-      </div>
+      <div class="bookTop"><span class="grab" aria-hidden="true"></span><h2 id="diaryTitle">Diary</h2><span id="bookNav"></span></div>
+      <div class="pagesWrap"><span class="ribbon" aria-hidden="true"></span><div id="bookPages"></div><span class="edges" aria-hidden="true"></span></div>
     </div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
-  <script type="module" src="js/main.js?v=8"></script>
+  </div>
+  <script type="module" src="js/main.js?v=9"></script>
 </body>
 </html>
