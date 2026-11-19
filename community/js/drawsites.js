@@ -166,9 +166,6 @@ export function drawPins(c, S, t) {
 }
 export function drawBallGames(c, S, t) {
   const playing = (flag) => S.baos.filter((b) => { const st = b.plan && b.plan[b.si]; return st && st[flag] && st.begun; });
-  for (const b of playing('shoot')) { const T = 1.9, u = (b.st % T) / T, hx = -481, hy = -80;
-    let x, y; if (u < 0.7) { const v = u / 0.7; x = b.x - 14 + (hx - b.x + 14) * v; y = -38 + (hy + 38) * v - Math.sin(v * Math.PI) * 46; } else { const v = (u - 0.7) / 0.3; x = hx - v * 6; y = hy + v * 74; }
-    c.save(); c.translate(x, y); c.rotate(u * 12); dot(c, 0, 0, 5, '#F2913D', 1.1); ln(c, [-5, 0, 5, 0], INK, 0.7); c.restore(); }
   const pl = playing('rally');
   if (pl.length) { const a = pl[0].x, b2 = pl.length > 1 ? pl[1].x : -675, u = (Math.sin(t * 2.6) + 1) / 2, x = a + (b2 - a) * u + (a < b2 ? 16 : -16) * (1 - 2 * u); dot(c, x, -22 - Math.sin(u * Math.PI) * (pl.length > 1 ? 34 : 14), 2.6, '#D8F26B', 0.8); }
 }

@@ -141,6 +141,9 @@ export const FX = {
 };
 
 export const TH = {
+  basketball(c, o) { c.save(); c.translate(0, -6.5); c.rotate(((o && o.x) || 0) / 6.5); circ(c, 0, 0, 6.5, '#F2913D', 1.2); c.clip();
+    c.beginPath(); c.moveTo(-7, 0); c.lineTo(7, 0); c.moveTo(0, -7); c.lineTo(0, 7); c.arc(-9.5, 0, 6.5, -0.8, 0.8); c.moveTo(9.5 - 6.5 * Math.cos(0.8), -6.5 * Math.sin(0.8)); c.arc(9.5, 0, 6.5, Math.PI + 0.8, Math.PI - 0.8, true);
+    c.strokeStyle = 'rgba(58,42,34,.75)'; c.lineWidth = 0.8; c.stroke(); c.restore(); },
   ball(c) { circ(c, 0, -8, 8, '#E8604C'); c.beginPath(); c.arc(0, -8, 8, -0.6, 0.6); c.lineTo(0, -8); c.closePath(); c.fillStyle = '#fff'; c.fill(); c.beginPath(); c.arc(0, -8, 8, Math.PI - 0.6, Math.PI + 0.6); c.lineTo(0, -8); c.closePath(); c.fill(); circ(c, 0, -8, 8, null); },
   plant(c, o, S, t) {
     const dr = (o.water ?? 0.7) < 0.35 ? 1 : 0;

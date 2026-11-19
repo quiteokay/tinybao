@@ -46,7 +46,7 @@ export function addMess(kind, x, floor) {
   const [a, b] = xBounds(S, floor);
   S.mess.push({ id: uid(), kind, x: clamp(x, a, b), floor });
 }
-function removeThing(o) { const i = R.S.objects.indexOf(o); if (i >= 0) R.S.objects.splice(i, 1); }
+function removeThing(o) { if (o.type === 'basketball') return; /* the basketball never goes away */ const i = R.S.objects.indexOf(o); if (i >= 0) R.S.objects.splice(i, 1); }
 
 export function initBao(b) {
   Object.assign(b, { alt: b.alt || 0, hop: 0, facing: 1, pose: 'idle', expr: null, plan: null, si: 0, st: 0, blinkT: rand(1, 5), blink: 0,
@@ -62,6 +62,7 @@ export function init(S) {
   if (!S.queue) S.queue = ORDER.slice(S.projIdx || 0); // saves from before the choice: carry on from where the list had got to
   if (S.build) { S.proj = { id: 'floor', p: S.build.p * 0.59 }; delete S.build; } // saves from the first version
   R.fx = buildFixtures(S);
+  ensureBall(S);
   compactDiary(S);
   if (S.tray && !S.tray.bao) S.tray.bao = { used: false };
   if (!S.proj) startNext(S, true);
@@ -563,8 +564,8 @@ const ACTS = [
     return { score: (1 - b.needs.fun) * 0.5 + 0.05, claim: f.key, plan: [at(f, used(f.key) ? 24 : -24), act(15, { pose: 'sit', expr: 'content', prop: 'cup', soft: true, done: (b) => { b.needs.fun = Math.min(1, b.needs.fun + 0.5); b.needs.social = Math.min(1, b.needs.social + 0.2); log(S, 'patio', { a: b }, { p: 0.12 }); } })] };
   } },
   { id: 'hoops', tags: ['play'], label: 'shooting hoops', try(S, b, h) {
-    const f = freeFx('hoop', b); if (!f || cold(S) || isNight(h)) return;
-    return { score: (1 - b.needs.fun) * 0.7, claim: f.key, plan: [at(f, used(f.key) ? 54 : 0), act(11, { pose: 'jump', expr: 'joy', face: -1, shoot: true, done: (b) => { b.needs.fun = 1; b.needs.energy -= 0.06; log(S, 'hoops', { a: b }, { p: 0.2 }); } })] };
+    const f = freeFx('hoop', b); if (!f || cold(S) || isNight(h) || !onCourt(theBall(S))) return;
+    return { score: (1 - b.needs.fun) * 0.7, claim: f.key, plan: [at(f, used(f.key) ? 54 : 0), act(11, { pose: 'idle', expr: 'joy', face: -1, shoot: true, tick: (b) => shootTick(S, b), done: (b) => { b.needs.fun = 1; b.needs.energy -= 0.06; log(S, 'hoops', { a: b }, { p: 0.2 }); } })] };
   } },
   { id: 'bowl', tags: ['play'], label: 'bowling', try(S, b) {
     const f = freeFx('lane', b); if (!f) return;
@@ -761,7 +762,7 @@ export function dropThing(type, x, h) {
   if (type === 'cake') o.uses = 8;
   if (type === 'plant') o.water = 0.7;
   S.objects.push(o);
-  if (S.objects.length > 40) { const old = S.objects.find((q) => !q.heldBy && q !== o); if (old) removeThing(old); }
+  if (S.objects.length > 40) { const old = S.objects.find((q) => !q.heldBy && q !== o && q.type !== 'basketball'); if (old) removeThing(old); }
   return o;
 }
 // ---------- moving furniture ----------
@@ -798,6 +799,7 @@ function landedThing(S, o) {
   o.sq = 0.3;
   if (o.type === 'treat') { emit('puff', o.x, o.floor * FH + 3, { vy: 6, life: 0.5, s: 0.5 }); return; }
   burst('puff', o.x, o.floor * FH + 4, 4, 22); sfx(o.unseen ? 'land' : 'thud');
+  if (o.type === 'basketball') { if (o.moved && clock.t - (o.lastReact || 0) > 4000) { o.lastReact = clock.t; callToCourt(S, o); } o.moved = false; return; }
   if (o.type === 'party') return startParty(S, o);
   if (o.type === 'treats') return burstTreats(S, o);
   if (o.type === 'cake') { log(S, 'cake', {}, { important: true }); addMark(S, { k: 'photo', what: 'cake' }); }
@@ -925,6 +927,53 @@ function reactTo(S, o) {
   if (c && chance(0.5) && near(c, o) < 800 && !['wood', 'seeds', 'duck', 'teddy', 'paint'].includes(o.type)) { setPlan(c, joinPlan(S, o), 'react', 'joining in'); c.hurry = 1.5; }
 }
 
+// ---------- the basketball: it lives with the court and never goes away ----------
+const COURT = { lo: -512, hi: -290, rest: -440, hx: -481, rim: 80 }, BALL_R = 6.5;
+const theBall = (S) => S.objects.find((o) => o.type === 'basketball');
+const onCourt = (o) => !!o && o.floor === 0 && !o.held && !o.heldBy && !o.falling && o.x >= COURT.lo && o.x <= COURT.hi;
+const shooting = (b) => { const st = curStep(b); return !!(st && st.shoot && st.begun); };
+function ensureBall(S) {
+  if (!S.done.court || theBall(S)) return;
+  S.objects.push({ id: uid(), type: 'basketball', x: COURT.rest, floor: 0, alt: 0, vy: 0, falling: false, t: clock.t, unseen: false });
+}
+// Everyone at the hoop takes turns with the one ball: a shot, down through the net, and a bounce over to the next player.
+function shootTick(S, b) {
+  const o = theBall(S); if (!onCourt(o)) { b.st = 1e9; return; }
+  const players = S.baos.filter(shooting).sort((p, q) => (p.id < q.id ? -1 : 1)), n = players.length, me = players.indexOf(b);
+  const T = 1900, k = Math.floor(clock.t / T), u = (clock.t % T) / T;
+  if (me < 0 || me !== k % n) { b.pose = 'idle'; return; } // waiting for a turn
+  b.pose = u < 0.25 ? 'jump' : 'idle';
+  const sx = b.x - 14, nx = players[(me + 1) % n].x - 14; let x, h;
+  if (u < 0.55) { const v = u / 0.55; x = sx + (COURT.hx - sx) * v; h = BALL_R + (COURT.rim - BALL_R) * v + Math.sin(v * Math.PI) * 60; }
+  else if (u < 0.72) { const v = (u - 0.55) / 0.17; x = COURT.hx - v * 4; h = COURT.rim - (COURT.rim - BALL_R) * v * v; }
+  else { const v = (u - 0.72) / 0.28; x = COURT.hx - 4 + (nx - COURT.hx + 4) * v; h = BALL_R + Math.abs(Math.sin(v * Math.PI * 2)) * 18 * (1 - v); }
+  o.x = x; o.alt = Math.max(0, h - BALL_R); o.floor = 0;
+}
+// The visitor moved the ball: two baos come out to play, whatever the time or weather. At night someone may get woken up for it.
+function callToCourt(S, o) {
+  const f = fxs('hoop')[0]; if (!f) return;
+  const team = freeAdults(S).sort((p, q) => near(p, o) - near(q, o)).slice(0, 2); let woken = null;
+  if (team.length < 2) {
+    const s = adults(S).filter((b) => b.sleeping && !b.held && !b.carriedBy && !team.includes(b)).sort((p, q) => near(p, o) - near(q, o))[0];
+    if (s) { abort(s); s.owl = clock.t + 15 * 60000; woken = s; team.push(s); }
+  }
+  if (!team.length) return;
+  const fetcher = onCourt(o) ? null : team.find((b) => b !== woken) || team[0];
+  team.forEach((b, i) => {
+    const steps = [b === woken ? act(1.6, { pose: 'idle', expr: 'sleep', start: (q) => say(q, 'zzz', 1.6) }) : act(0.7, { pose: 'jump', expr: 'wow', start: (q) => { say(q, 'ex', 1.2); sfx('blip'); } })];
+    if (b === fetcher) steps.push(...carryTo(S, o, go(COURT.rest, 0), 'taking the basketball out to the court'), call(putDown));
+    steps.push(go(f.x + i * 54, 0),
+      act(90, { pose: 'idle', expr: 'normal', face: -1, start: (q) => { q.hurry = 0; q.label = 'waiting for the ball'; }, tick: (q) => { if (onCourt(o)) q.st = 1e9; } }),
+      act(30, { pose: 'idle', expr: 'joy', face: -1, shoot: true, start: (q) => { q.label = 'playing basketball'; }, tick: (q) => shootTick(S, q),
+        done: (q) => { q.needs.fun = 1; q.needs.energy -= 0.05;
+          if (i !== 0) return; const mate = team[1], w = weatherAt(S);
+          if (!mate) log(S, 'hoops', { a: q }, { p: 0.6 });
+          else if (woken) log(S, 'hoops_night', { a: team.find((x) => x !== woken), b: woken }, { p: 0.9, gap: 600 });
+          else log(S, w === 'rain' ? 'hoops_rain' : w === 'snow' ? 'hoops_snow' : 'hoops_call', { a: q, b: mate }, { p: 0.8, gap: 600 }); } }));
+    setPlan(b, steps, 'court', b === woken ? 'woken up for basketball' : 'off to play basketball'); b.claim = f.key; b.hurry = b === woken ? 1.2 : 1.6; b.last = 'hoops';
+  });
+}
+
 // ---------- party popper: everyone awake comes and dances ----------
 function startParty(S, o) {
   const x = o.x, f = o.floor; removeThing(o);
@@ -965,7 +1014,7 @@ export function notePhoto(x, f, auto) {
 }
 
 // ---------- daily things ----------
-const SPECIAL = ['party', 'treats', 'treat'];
+const SPECIAL = ['party', 'treats', 'treat', 'basketball'];
 export function ensureTray(S) {
   const today = dayKey(clock.t);
   if (S.tray && S.tray.day === today) return;
@@ -1128,7 +1177,7 @@ function advance(S, hours, live, t) {
   else if (P.id === 'birdhouse') { const tr = S.trees.find((q) => q.x === P.x); if (tr) tr.house = true; if (who) log(S, 'birdhouse_done', { a: who }, { important: true, t: lt }); }
   else if (P.id === 'flowers') { for (let i = 0; i < 3; i++) if (S.flowers.length < 14) S.flowers.push({ x: W + 190 + rand(-44, 44), t: live ? clock.t : t, hue: pick([340, 20, 48, 280, 200]), seen: true }); if (who) log(S, 'flowers_done', { a: who }, { p: 0.6, t: lt }); }
   else if (P.id === 'repaint') { const key = P.f + ',' + P.c; let col; do { col = pick(PAINTS); } while (col === S.paint[key]); S.paint[key] = col; if (who) log(S, 'repaint_done', { a: who, room: P.room }, { important: true, t: lt }); }
-  else { S.done[P.id] = true; addMark(S, { k: 'photo', what: 'floor' }); R.fx = buildFixtures(S); if (who) log(S, 'done_' + P.id, { a: who }, { important: true, t: lt }); if (live) { sfx('fanfare'); cheer(S); } }
+  else { S.done[P.id] = true; addMark(S, { k: 'photo', what: 'floor' }); R.fx = buildFixtures(S); ensureBall(S); if (who) log(S, 'done_' + P.id, { a: who }, { important: true, t: lt }); if (live) { sfx('fanfare'); cheer(S); } }
   S.proj = null; startNext(S, live, t);
 }
 function cheer(S) { for (const b of adults(S)) if (!b.sleeping && interruptible(b)) setPlan(b, [act(3, { pose: 'jump', expr: 'joy', start: (q) => say(q, 'star') })], 'cheer', 'celebrating'); }
@@ -1159,6 +1208,7 @@ function tickWorld(S, dt) {
   for (const o of S.objects) {
     if (o.sq) o.sq *= Math.pow(0.003, dt);
     if (o.type === 'balloon' && !o.held && !o.heldBy) { const top = o.floor >= nFloors(S) || roomAt(S, o.x, o.floor) == null ? 150 : 78; o.falling = false; o.alt += ((top + Math.sin(clock.t / 700 + o.x) * 4) - o.alt) * Math.min(1, dt * 2); if (o.unseen && !o.told) { o.told = true; sfx('land'); reactTo(S, o); startleNear(S, o.x, o.floor, 230); } continue; }
+    if (o.type === 'basketball' && o.alt > 0 && !o.falling && !o.held && !o.heldBy && !S.baos.some(shooting)) { o.falling = true; o.vy = 0; }
     if (o.falling) { o.vy -= 1500 * dt; o.alt += o.vy * dt; if (o.alt <= 0) { o.alt = 0; o.falling = false; o.vy = 0; landedThing(S, o); } }
   }
   // needs

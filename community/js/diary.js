@@ -25,6 +25,7 @@ export const THINGS = {
   party:     { name: 'a party popper' },
   treats:    { name: 'a bag of treats' },
   treat:     { name: 'a treat' },
+  basketball: { name: 'a basketball' },
 };
 
 const THEORIES = [
@@ -124,7 +125,7 @@ const T = {
   done_porch: ['The porch is finished. {a} sat on it straight away and would not get up.'],
   done_veg: ['The vegetable garden is dug and planted. {a} has named every row.'],
   done_patio: ['The patio is done, with a table and an umbrella. {a} says it is very continental.'],
-  done_court: ['The basketball court is finished! {a} took the first shot and missed by a lot.'],
+  done_court: ['The basketball court is finished, and there is a basketball to go with it! {a} took the first shot and missed by a lot.'],
   done_bowling: ['We have a bowling alley. In the basement. {a} switched the sign on and everybody cheered.'],
   done_tennis: ['The tennis court is ready. {a} painted the lines, which are mostly straight.'],
   done_lake: ['The lake is full. It took for ever. {a} stood at the edge and said “well”.'],
@@ -136,6 +137,10 @@ const T = {
   porch: ['{a} sat on the porch and watched the path.', '{a} spent the afternoon on the porch.'],
   patio: ['{a} had a drink out on the patio.', '{a} sat under the umbrella for a good while.'],
   hoops: ['{a} shot hoops for an hour and scored twice.', '{a} practised basketball. The hoop is very high for a bao.'],
+  hoops_call: ['{a} and {b} heard the basketball bounce and came out to play.', '{a} and {b} played a game of basketball. Nobody kept score.'],
+  hoops_rain: ['{a} and {b} played basketball in the rain anyway.'],
+  hoops_snow: ['{a} and {b} played basketball in the snow. The ball kept getting lost.'],
+  hoops_night: ['{a} got {b} out of bed for a game under the court light.'],
   bowl: ['{a} went bowling in the basement and got a strike.', '{a} bowled three gutter balls and one perfect one.'],
   tennis: ['{a} played tennis, mostly against the net.', '{a} was on the tennis court for ages.'],
   fishing: ['{a} went fishing and caught nothing, happily.', '{a} sat by the lake with a rod all afternoon.'],

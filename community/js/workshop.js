@@ -55,7 +55,7 @@ function refresh(api) {
     + section('Time', `<div class="g-row"><span>skip</span>${[1, 2, 3].map((n) => btn('skip', n * H, `+${n}h`)).join('')}${[1, 2, 3].map((n) => btn('skip', n * D, `+${n}d`)).join('')}${[1, 2, 3].map((n) => btn('skip', n * 7 * D, `+${n}w`)).join('')}</div>
       <div class="g-row"><span>go to</span>${btn('hour', 7, 'morning')}${btn('hour', 12, 'noon')}${btn('hour', 19, 'evening')}${btn('hour', 3, '3am')}</div>
       <div class="g-row"><span>speed</span>${[1, 10, 60].map((s) => btn('speed', s, '×' + s, c.speed === s ? 'class="on"' : '')).join('')}</div>`)
-    + section('Today’s tray', `<div class="g-grid g-items">${Object.keys(THINGS).filter((k) => k !== 'treat').map((k) => `<button data-a="item" data-v="${k}" title="${THINGS[k].name}"><canvas data-icon="${k}"></canvas></button>`).join('')}</div>
+    + section('Today’s tray', `<div class="g-grid g-items">${Object.keys(THINGS).filter((k) => k !== 'treat' && k !== 'basketball').map((k) => `<button data-a="item" data-v="${k}" title="${THINGS[k].name}"><canvas data-icon="${k}"></canvas></button>`).join('')}</div>
       <div class="g-grid g-baos">${ADDED.map((b, i) => `<button data-a="bao" data-v="${i}" title="${b.name}" ${usedNames.has(b.name) ? 'disabled' : ''}><canvas data-bao="${i}"></canvas><small>${b.name}</small></button>`).join('')}</div>
       <div class="g-row">${btn('refill', '', 'refill today’s tray')}</div>`)
     + section('Building', `<div class="g-row"><span>now: ${proj}</span>${btn('finish', '', 'finish it')}${btn('choice', '', 'put the choice up')}</div>
