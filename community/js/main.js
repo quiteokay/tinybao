@@ -373,7 +373,7 @@ function openCard(mode, b) {
   $('bcTitle').textContent = mode === 'meet' ? `Meet ${spec.name}!` : mode === 'welcome' ? `Welcome, ${spec.name}!` : spec.name;
   const where = mode === 'meet' ? ` ${spec.name} would like to move in today.` : b && b.arrived ? ` Here since ${dayLabel(dayKey(b.arrived)).replace(/^(Today|Yesterday)$/, (m) => m.toLowerCase())}.` : '';
   $('bcAbout').textContent = `${spec.name} ${ABOUT[spec.trait] || 'is lovely'}.${where}`;
-  $('bcName').value = spec.name; $('bcErr').textContent = '';
+  $('bcName').value = spec.name; $('bcErr').textContent = ''; $('bcOk').disabled = false;
   $('bcOk').textContent = mode === 'meet' ? `bring ${spec.name} in` : 'done';
   $('bcCancel').textContent = mode === 'meet' ? 'not now' : 'cancel'; $('bcCancel').hidden = mode === 'welcome';
   const sw = $('bcSwatches'); sw.innerHTML = '';
@@ -411,6 +411,7 @@ $('bcName').addEventListener('input', () => {
   $('bcTitle').textContent = card.mode === 'meet' ? `Meet ${n || 'them'}!` : card.mode === 'welcome' ? `Welcome, ${n || card.orig}!` : (n || card.orig);
   $('bcAbout').textContent = $('bcAbout').textContent.split(card.shownName || card.orig).join(n || card.orig); card.shownName = n || card.orig;
   if (card.mode === 'meet') $('bcOk').textContent = `bring ${shown} in`;
+  $('bcOk').disabled = !n; // no name, no bringing in: the button dims until there is one
   $('bcErr').textContent = '';
 });
 $('tag').addEventListener('click', (e) => { if (e.target.closest('.edit') && tagFor) openCard('edit', tagFor); });
