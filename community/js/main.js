@@ -415,11 +415,14 @@ $('bcName').addEventListener('input', () => {
   $('bcOk').disabled = !n; // no name, no bringing in: the button dims until there is one
   $('bcErr').textContent = '';
 });
-$('tag').addEventListener('click', (e) => { if (e.target.closest('.edit') && tagFor) openCard('edit', tagFor); });
+// Tapping a bao's name and status opens their card, to rename or recolour them.
+$('tag').addEventListener('click', () => { if (tagFor) openCard('edit', tagFor); });
+$('tag').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && tagFor) { e.preventDefault(); openCard('edit', tagFor); } });
 // ---------- music ----------
 // ---------- settings: music, sounds, updates, and saving a copy of the community ----------
 function drawSettings() {
-  $('swMusic').setAttribute('aria-checked', String(music.isOn())); $('swSound').setAttribute('aria-checked', String(!snd.isMuted()));
+  $('swMusic').setAttribute('aria-pressed', String(!music.isOn())); $('swMusic').setAttribute('aria-label', music.isOn() ? 'Mute music' : 'Turn music on');
+  $('swSound').setAttribute('aria-pressed', String(snd.isMuted())); $('swSound').setAttribute('aria-label', snd.isMuted() ? 'Unmute sound effects' : 'Mute sound effects');
   $('volMusic').value = Math.round(music.getVolume() * 100); $('volSound').value = Math.round(snd.getVolume() * 100);
   $('volMusic').classList.toggle('off', !music.isOn()); $('volSound').classList.toggle('off', snd.isMuted());
   $('stVersion').textContent = updateReady ? 'Something new is ready!' : `You have version ${VERSION}`;
@@ -579,7 +582,7 @@ function frame(now) {
   if (tagFor && (now < tagUntil || tagFor === follow) && S.baos.includes(tagFor) && !tagFor.held) {
     const p = toScreen(tagFor.x, tagFor.floor * FH + tagFor.alt + BAO * 0.84 * (tagFor.size || 1) + 16);
     tag.hidden = false; tag.style.left = clamp(p.x, 70, V.vw - 70) + 'px'; tag.style.top = Math.max(30, p.y) + 'px';
-    const txt = `${esc(tagFor.name)} <small>· ${esc(tagFor.label)}</small><button class="edit" title="Rename or recolour" aria-label="Rename or recolour ${esc(tagFor.name)}">✎</button>`; if (tag.dataset.t !== txt) { tag.innerHTML = txt; tag.dataset.t = txt; }
+    const txt = `${esc(tagFor.name)} <small>· ${esc(tagFor.label)}</small>`; if (tag.dataset.t !== txt) { tag.innerHTML = txt; tag.dataset.t = txt; tag.setAttribute('aria-label', `${tagFor.name}, ${tagFor.label}. Open their card`); }
   } else tag.hidden = true;
   requestAnimationFrame(frame);
 }
