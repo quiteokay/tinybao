@@ -5,8 +5,8 @@ import { drawBaoShape } from './drawbao.js';
 import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, renameBao, plansInfo, choosePlan, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
 import * as music from './music.js';
-import { openBook, closeBook, bookOpen, bookPage, bookCount, bookBusy, bookJump, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
-import { usePhotoStore, putFull, getFull, delFull, putDays, daysFrom, oldestDay, allDays, clearDays } from './photos.js';
+import { openNotebook, closeNotebook, turn as turnPage, goTo, goToday, firstDay, refresh as refreshNotebook, pickerHTML, attachNotebookInput, notebookDay, NAME_INK } from './notebook.js';
+import { usePhotoStore, putFull, getFull, delFull, putDays, allDays, clearDays, dayEntries, dayKeys } from './photos.js';
 import { FLAVORS } from './drawbao.js';
 import { SIGN } from './drawsites.js';
 import { inWorkshop, openDoor, mountWorkshop, shopClock, saveShopClock, workshopTick } from './workshop.js';
@@ -175,7 +175,7 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
   if (!$('photoView').hidden) { if (e.key === 'Escape') closePhoto(); return; }
-  if (!$('diary').hidden) { if (e.key === 'Escape') closeDiary(); else if (e.key === 'ArrowRight') turnPage(1); else if (e.key === 'ArrowLeft') turnPage(-1); return; }
+  if (!$('diary').hidden) { if (e.key === 'Escape') { if (!$('nbPicker').hidden) $('nbPicker').hidden = true; else closeDiary(); } else if ($('nbCover').hidden) { if (e.key === 'ArrowRight') turnPage(1); else if (e.key === 'ArrowLeft') turnPage(-1); } return; }
   if (!$('photoView').hidden) { if (e.key === 'Escape') closePhoto(); return; }
   if (!$('baoCard').hidden) { if (e.key === 'Escape') closeCard(); return; }
   if (!$('settings').hidden) { if (e.key === 'Escape') closeSettings(); return; }
@@ -310,7 +310,7 @@ $('photoView').addEventListener('click', (e) => { if (e.target === $('photoView'
 $('pvDel').addEventListener('click', () => {
   const btn = $('pvDel'); if (!btn.classList.contains('sure')) { btn.classList.add('sure'); btn.textContent = 'really delete?'; return; }
   const p = viewing; if (!p) return; S.photos.splice(S.photos.indexOf(p), 1); delFull(p.id); save(); closePhoto(); snd.play('blip');
-  if (!$('diary').hidden) openDiary(bookPage(), diarySpan);
+  if (!$('diary').hidden) refreshNotebook();
 });
 swipeToClose($('photoView'), $('pvImg'), closePhoto);
 // Pull something down far enough and it closes.
@@ -460,28 +460,56 @@ async function archiveOld() {
   if (await putDays(old)) { S.diary = S.diary.filter((e) => e.d >= cutoff); save(); } // only removed once safely written
   archiving = false;
 }
-let diarySpan = RECENT_DAYS, opening = 0;
-async function openDiary(at, span, fromEnd) {
-  const ticket = ++opening; span = span || RECENT_DAYS; diarySpan = span; $('diary').hidden = false; $('swipeHint').hidden = swipes() >= 2;
-  const from = dayKey(clock.t - span * 86400000), older = await daysFrom(from), oldest = await oldestDay();
-  if (ticket !== opening || $('diary').hidden) return;
-  const entries = older.concat(S.diary).filter((e) => e.d >= from).sort((a, b) => a.t - b.t);
-  const hasEarlier = (oldest && oldest < from) || S.diary.some((e) => e.d < from);
-  const who = S.baos.find((b) => b.id === S.diarist);
-  $('diaryTitle').textContent = who ? `${who.name}’s diary` : 'The diary';
-  // everyone who might be mentioned: residents in their own colour, old friends in a quiet brown
+// ---------- the diary: a notebook lying on the table, one day to a page ----------
+let opening = 0, diaryAt = 0;
+const parseDay = (k) => { const [Y, M, D] = k.split('-').map(Number); return new Date(Y, M - 1, D, 12).getTime(); };
+async function loadDay(key) { // recent days live in the save; older ones in the archive
+  const seen = new Set(), out = [];
+  for (const e of (await dayEntries(key)).concat(S.diary.filter((q) => q.d === key))) { const id = e.t + '|' + e.text; if (!seen.has(id)) { seen.add(id); out.push(e); } }
+  return out.sort((x, y) => x.t - y.t);
+}
+const hasNews = () => { const last = S.diary[S.diary.length - 1]; return !!last && last.t > (S.diaryRead || 0); };
+const firstNewDay = () => { const e = S.diary.find((q) => q.t > (S.diaryRead || 0)); return e ? e.d : null; };
+function drawDiaryDot() { $('bDiary').classList.toggle('new', !!S && $('diary').hidden && hasNews()); }
+function markRead() { S.diaryRead = clock.t; drawDiaryDot(); }
+function diaryPeople() { // everyone who might be mentioned: residents in their own colour, old friends in a quiet brown
   const people = S.baos.map((b) => ({ name: b.name, id: b.id, color: NAME_INK[b.flavor] || '#8a6a4a' }));
   for (const n of S.everNames || []) if (!people.some((p) => p.name === n)) people.push({ name: n, id: null, color: '#8a7a72' });
-  people.sort((a, b) => b.name.length - a.name.length);
-  openBook({ host: $('bookPages'), nav: $('bookNav'), entries, hasEarlier, photos: S.photos || [], people, dayLabel, at: typeof at === 'number' ? at : null, fromEnd,
-    onEarlier: () => openDiary(null, span + 240, bookCount()),
-    onPhoto: (id) => openPhoto(id),
-    onTurn: () => snd.play('page'),
-    onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } } });
+  return people.sort((a, b) => b.name.length - a.name.length);
+}
+async function openDiary(day) {
+  const ticket = ++opening; diaryAt = performance.now();
+  const news = !day && hasNews();
+  $('diary').hidden = false; document.body.classList.add('diaryOpen'); $('nbPicker').hidden = true;
+  $('nbCover').hidden = !news; $('nb').hidden = news; drawDiaryDot();
+  const who = S.baos.find((b) => b.id === S.diarist); $('nbCoverName').textContent = who ? `${who.name}’s diary` : 'The diary';
+  const keys = new Set(await dayKeys()); for (const e of S.diary) keys.add(e.d);
+  if (ticket !== opening || $('diary').hidden) return;
+  const days = [...keys].sort(), today = dayKey(clock.t);
+  await openNotebook({ host: $('nbSheet'), today, first: [days[0], dayKey(S.created || clock.t), today].filter(Boolean).sort()[0], days, load: loadDay,
+    photos: (k) => (S.photos || []).filter((p) => p.day === k), photoDays: (S.photos || []).map((p) => p.day), people: diaryPeople(),
+    weather: (k) => weatherAt(S, parseDay(k)),
+    onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } },
+    onPhoto: (id) => openPhoto(id), onTurn: () => snd.play('page'), onPick: openPicker }, day || (news ? firstNewDay() : null));
+  if (!news) markRead();
   snd.unlock(); snd.play('page');
 }
-function closeDiary() { $('diary').hidden = true; closeBook(); }
-attachBookInput($('bookPages'));
+function closeDiary() { opening++; $('diary').hidden = true; document.body.classList.remove('diaryOpen'); closeNotebook(); drawDiaryDot(); }
+attachNotebookInput($('nbSheet'));
+$('nbOpen').addEventListener('click', () => { $('nbCover').hidden = true; $('nb').hidden = false; markRead(); snd.play('page'); });
+$('nbRibbon').addEventListener('click', () => { if (notebookDay() === dayKey(clock.t) || !goToday()) snd.play('blip'); });
+// tapping the table (anywhere but the notebook) closes it
+for (const el of [$('diary'), $('nbTable'), $('nbCover')]) el.addEventListener('click', (e) => { if (e.target === el && performance.now() - diaryAt > 450) closeDiary(); });
+function openPicker() {
+  $('nbPick').innerHTML = pickerHTML(); $('nbPicker').hidden = false; snd.play('tick');
+  const cur = $('nbPick').querySelector('.cur') || $('nbPick').querySelector('.today'); if (cur) cur.scrollIntoView({ block: 'center' });
+}
+$('nbPicker').addEventListener('click', (e) => {
+  const d = e.target.closest('[data-day]'), first = e.target.closest('[data-pkfirst]');
+  if (d || first) { $('nbPicker').hidden = true; goTo(d ? d.dataset.day : firstDay()); }
+  else if (e.target === $('nbPicker')) $('nbPicker').hidden = true;
+});
+setInterval(drawDiaryDot, 1500);
 // ---------- the hidden door to the workshop ----------
 const chord = { d: -1e9, c: -1e9, first: -1e9, n: 0, swallow: -1e9 };
 const zoomedOut = () => V.s <= minS() * 1.03;
@@ -498,19 +526,6 @@ $('bCam').addEventListener('pointerdown', () => chordDown('c'));
 let typed = '';
 window.addEventListener('keydown', (e) => { if (e.key.length !== 1 || (e.target.closest && e.target.closest('input'))) return; typed = (typed + e.key.toLowerCase()).slice(-4); if (typed === 'shop' && zoomedOut()) { typed = ''; openDoor(shopApi); } });
 $('bDiary').addEventListener('click', () => { if (!swallowed()) openDiary(); });
-swipeToClose($('diary'), document.querySelector('#diary .book'), () => { noteSwipe(); closeDiary(); }, bookBusy);
-// "swipe down to close" shows on the cover until they have closed the diary that way twice
-const swipes = () => { try { return +localStorage.getItem('tinybao.swipes') || 0; } catch (e) { return 2; } };
-function noteSwipe() { try { localStorage.setItem('tinybao.swipes', String(swipes() + 1)); } catch (e) { /* ignore */ } }
-// first page: the very first day, so the whole archive is loaded; latest: today's writing
-$('bookFirst').addEventListener('click', async () => {
-  const oldest = await oldestDay(), first = [oldest, S.diary.length ? S.diary[0].d : null].filter(Boolean).sort()[0];
-  const span = first ? Math.ceil((clock.t - new Date(first + 'T00:00:00').getTime()) / 86400000) + 2 : diarySpan;
-  if (span > diarySpan) openDiary(0, span); else if (!bookJump('first')) snd.play('blip');
-});
-$('bookLast').addEventListener('click', () => { if (!bookJump('last')) snd.play('blip'); });
-$('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) closeDiary(); });
-window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(bookPage(), diarySpan); });
 async function exportCopy() { const data = JSON.parse(serialize()); data.diary = (await allDays()).concat(data.diary); // the whole diary goes in the copy
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })); a.download = `tinybao-community-${dayKey(clock.t)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 $('importFile').addEventListener('change', async (e) => {
@@ -608,7 +623,8 @@ function boot() {
   const loaded = load(); S = loaded || newState();
   const first = !loaded;
   if (first) S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
-  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what, info) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'photo') takePhoto(info.x, info.f * FH + 40, true); if (what === 'plans' || what === 'grounds') { updatePlansChip(true); if (!$('plansCard').hidden) renderPlans(); } if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
+  init(S); if (S.diaryRead == null) S.diaryRead = clock.t; // older saves: nothing counts as new until something new is written
+  R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what, info) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'photo') takePhoto(info.x, info.f * FH + 40, true); if (what === 'plans' || what === 'grounds') { updatePlansChip(true); if (!$('plansCard').hidden) renderPlans(); } if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
   window.addEventListener('resize', resize); resize();
   let from = S.lastSeen || clock.t;
   if (Q.has('skipDays')) from = clock.t - (+Q.get('skipDays') || 1) * 86400000;

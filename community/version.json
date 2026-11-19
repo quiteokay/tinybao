@@ -14,14 +14,17 @@
     "js/drawsites.js",
     "js/sound.js",
     "js/music.js",
-    "js/book.js",
     "js/photos.js",
-    "js/workshop.js"
+    "js/workshop.js",
+    "js/notebook.js",
+    "js/doodles.js",
+    "fonts/PatrickHand-latin.woff2"
   ],
   "changes": [
     {
       "v": 13,
       "notes": [
+        "the diary is a little notebook on the table now, one day to a page, with doodles",
         "the diary writer now writes about themselves properly (\"I keep\", not \"I keeps\"), old pages included"
       ]
     },

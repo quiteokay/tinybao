@@ -54,7 +54,7 @@
   </div>
 
   <div id="bar">
-    <button class="round" id="bDiary" title="Diary" aria-label="Open the diary">
+    <button class="round" id="bDiary" title="Diary" aria-label="Open the diary"><i class="dot" aria-hidden="true"></i>
       <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5" fill="#FFF3D6"/><path d="M5 3h3v18H5z" fill="#F2A65A"/><path d="M11 8h5M11 12h5M11 16h3"/><rect x="5" y="3" width="14" height="18" rx="2.5" fill="none"/></svg>
     </button>
     <div id="tray">
@@ -69,10 +69,27 @@
   </div>
 
   <div id="diary" hidden>
-    <div class="book">
-      <div class="bookTop"><span class="grab" aria-hidden="true"></span><div class="plate"><button class="jump" id="bookFirst" aria-label="First page" title="First page">«</button><h2 id="diaryTitle">Diary</h2><button class="jump" id="bookLast" aria-label="Latest page" title="Latest page">»</button></div><span id="bookNav"></span></div>
-      <div class="pagesWrap"><span class="ribbon" aria-hidden="true"></span><div id="bookPages"></div><span class="edges" aria-hidden="true"></span></div>
-      <p class="swipeHint" id="swipeHint" hidden>swipe down to close</p>
+    <div class="table" id="nbTable">
+      <svg class="prop stain" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="34" fill="none" stroke="#9A6542" stroke-width="5" opacity=".55"/></svg>
+      <svg class="prop pencil" viewBox="0 0 150 40" aria-hidden="true" fill="none" stroke="#3A2E2A" stroke-width="2.2" stroke-linejoin="round"><rect x="20" y="12" width="104" height="14" rx="2" fill="#F2C14E"/><path d="M124 12 L142 19 L124 26 Z" fill="#F1D9B5"/><path d="M137 17 L142 19 L137 21 Z" fill="#3A2E2A"/><rect x="6" y="12" width="14" height="14" rx="3" fill="#E58C9A"/></svg>
+      <div class="nb" id="nb">
+        <div class="rings" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet" id="nbSheet"></div>
+        <button class="ribbon" id="nbRibbon" aria-label="Back to today" title="Back to today"><i></i></button>
+      </div>
+      <div class="cover" id="nbCover" hidden>
+        <svg class="prop mug" viewBox="0 0 110 110" aria-hidden="true" fill="none" stroke="#3A2E2A" stroke-width="2.5"><circle cx="55" cy="55" r="40" fill="#E8DCCB"/><circle cx="55" cy="55" r="30" fill="#7A4A30"/><path d="M44 44 C 48 40, 54 40, 58 44" stroke="#F4EEE2" stroke-width="2" opacity=".6"/></svg>
+        <button class="closed" id="nbOpen" aria-label="Open the diary: there is a new page">
+          <span class="spine" aria-hidden="true"></span><span class="band" aria-hidden="true"></span>
+          <span class="label"><b id="nbCoverName">The diary</b><small>private!! (sort of)</small></span>
+          <svg class="coverBao" width="80" height="70" viewBox="0 0 80 70" aria-hidden="true" fill="none" stroke="#3A2E2A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 60 C 4 40, 18 22, 34 18 C 37 12, 43 12, 46 18 C 62 22, 76 40, 72 60 Z" fill="#FFF3DC"/><path d="M34 18 C 36 26, 44 26, 46 18" stroke-width="1.8"/><path d="M30 42 L32 42.4 M48 42 L50 42.4" stroke-width="3.4"/><path d="M36 48 C 38 51, 42 51, 44 48"/><circle cx="24" cy="48" r="4" fill="#F2A7A7" stroke="none"/><circle cx="56" cy="48" r="4" fill="#F2A7A7" stroke="none"/></svg>
+          <span class="sticky" aria-hidden="true">new<br>page!</span>
+          <span class="cribbon" aria-hidden="true"></span>
+        </button>
+        <p class="tapRead">tap to read</p>
+      </div>
+      <div class="picker" id="nbPicker" hidden><div class="pk" id="nbPick" role="dialog" aria-label="Choose a day"></div></div>
+      <p class="closeHint">tap the table to close</p>
     </div>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>

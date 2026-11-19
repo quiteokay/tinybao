@@ -44,3 +44,6 @@ export async function daysFrom(fromDay) { const r = await tx('diary', 'readonly'
 export async function oldestDay() { const r = await tx('diary', 'readonly', (st) => st.getAllKeys()); return r && r.length ? r[0] : null; }
 export async function allDays() { const r = await tx('diary', 'readonly', (st) => st.getAll()); return r ? r.flat() : []; }
 export const clearDays = () => tx('diary', 'readwrite', (st) => st.clear());
+// one archived day, and the list of every archived day, without loading the whole archive
+export async function dayEntries(key) { const r = await tx('diary', 'readonly', (st) => st.get(key)); return Array.isArray(r) ? r : []; }
+export async function dayKeys() { const r = await tx('diary', 'readonly', (st) => st.getAllKeys()); return r || []; }
