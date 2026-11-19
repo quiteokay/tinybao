@@ -18,7 +18,8 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 #tray { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; max-width: calc(100vw - 140px); }
 #slots { max-width: 100%; flex-wrap: wrap; justify-content: center; display: flex; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,.88); border: 2px solid var(--ink); border-radius: 22px; box-shadow: 0 3px 0 rgba(58,42,34,.25); }
 .slot { width: 54px; height: 54px; border-radius: 15px; background: #FFF3D6; border: 2px solid rgba(58,42,34,.25); display: grid; place-items: center; touch-action: none; cursor: grab; transition: transform .12s; }
-.slot canvas { pointer-events: none; }
+.slot canvas { pointer-events: none; width: 100% !important; height: 100% !important; display: block; }
+.slot { overflow: hidden; padding: 1px; }
 .slot.armed { background: #FFE08A; border-color: var(--ink); transform: translateY(-6px) scale(1.06); }
 .slot.used { background: transparent; border-style: dashed; cursor: default; }
 #trayNote { font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(40,30,20,.55); letter-spacing: .02em; }
@@ -37,7 +38,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 #cardBody { font-size: 14px; line-height: 1.45; }
 #cardBody p { margin: 5px 0; }
 .cardBtns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-.cardBtns button, 
+.cardBtns button { border: 2px solid var(--ink); border-radius: 14px; padding: 5px 14px; font-weight: 700; font-size: 13px; background: #fff; }
 #cardOk { background: #FFD166; }
 
 #diary { position: fixed; inset: 0; z-index: 40; background: rgba(40,30,50,.35); display: grid; place-items: end center; }
@@ -81,7 +82,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .slot.bao { background: #FFE3EC; }
 .slot.bao.used { background: transparent; }
 #slots .sep { width: 2px; align-self: stretch; margin: 6px 0; background: rgba(58,42,34,.18); border-radius: 2px; }
-@media (max-width: 430px) { #slots { gap: 5px; padding: 5px 6px; } .slot { width: 49px; height: 49px; border-radius: 13px; } .slot canvas { transform: scale(.9); } }
+@media (max-width: 430px) { #slots { gap: 5px; padding: 5px 6px; } .slot { width: 49px; height: 49px; border-radius: 13px; } }
 #bMusic { position: fixed; z-index: 4; right: 60px; top: max(12px, env(safe-area-inset-top)); width: 40px; height: 40px; }
 #bMusic svg { width: 22px; height: 22px; }
 #bMusic.on { background: #FFE08A; }
@@ -198,3 +199,9 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 
 /* long cards (an update after many versions) scroll instead of running off the screen */
 #card { max-height: calc(100vh - 32px - env(safe-area-inset-top)); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+#bGift { position: fixed; z-index: 4; right: 108px; top: max(12px, env(safe-area-inset-top)); width: 40px; height: 40px; }
+#bGift svg { width: 22px; height: 22px; }
+#bGift .dot { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; border-radius: 50%; background: #E8604C; border: 1.5px solid #fff; display: none; }
+#bGift.new .dot { display: block; } #bGift.new { animation: nudge 2.4s ease-in-out infinite; }
+#plans { max-width: calc(100vw - 188px); }

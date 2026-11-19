@@ -15,7 +15,7 @@ import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 9; // keep in step with version.json
+const VERSION = 10; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
@@ -344,7 +344,7 @@ function renderPlans() {
   const I = plansInfo(); if (!I) return closePlans();
   let h = `<h2>What the baos are building</h2><div class="now"><b>${esc(cap(I.name))}</b><span>${esc(cap(I.stage))}</span><div class="bar"><i style="width:${Math.round(I.p * 100)}%"></i></div><small>${esc(cap(I.eta))}</small></div>`;
   if (I.choice) {
-    h += `<h3>${I.choice.pick ? 'Next up' : 'Inspire their next addendum to be…'}</h3><div class="opts">${I.choice.opts.map((o) => `<button data-id="${o.id}" class="${o.id === I.choice.pick ? 'on' : ''}">${esc(cap(o.name))}<small>${esc(o.blurb)}</small></button>`).join('')}</div>`;
+    h += `<h3>${I.choice.pick ? 'Next up' : 'Inspire their next addition to be…'}</h3><div class="opts">${I.choice.opts.map((o) => `<button data-id="${o.id}" class="${o.id === I.choice.pick ? 'on' : ''}">${esc(cap(o.name))}<small>${esc(o.blurb)}</small></button>`).join('')}</div>`;
     h += `<p class="note">${I.choice.pick ? `${esc(cap(I.choice.opts.find((o) => o.id === I.choice.pick).name))} it is. They’ll start once this one is done. You can still change your mind until then.` : 'Tap one to choose.'}</p>`;
   } else h += `<p class="note">${I.more ? 'The next two ideas go up on the board when this one is a bit further along.' : 'The big list is done. Now it’s trees, flowers and odd jobs, for ever.'}</p>`;
   h += '<div class="cardBtns"><button id="pcOk">ok</button></div>';
@@ -405,6 +405,14 @@ $('bcCancel').addEventListener('click', closeCard);
 // a phone sends a late click after the tap that opened the card: ignore background taps for a moment
 $('baoCard').addEventListener('click', (e) => { if (e.target === $('baoCard') && card && card.mode !== 'welcome' && performance.now() - card.at > 450) closeCard(); });
 $('bcName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('bcOk').click(); e.stopPropagation(); });
+// the title, the line about them and the button follow the name as it is typed
+$('bcName').addEventListener('input', () => {
+  if (!card) return; const n = $('bcName').value.replace(/\s+/g, ' ').trim(), shown = n || (card.mode === 'meet' ? 'them' : card.orig);
+  $('bcTitle').textContent = card.mode === 'meet' ? `Meet ${n || 'them'}!` : card.mode === 'welcome' ? `Welcome, ${n || card.orig}!` : (n || card.orig);
+  $('bcAbout').textContent = $('bcAbout').textContent.split(card.shownName || card.orig).join(n || card.orig); card.shownName = n || card.orig;
+  if (card.mode === 'meet') $('bcOk').textContent = `bring ${shown} in`;
+  $('bcErr').textContent = '';
+});
 $('tag').addEventListener('click', (e) => { if (e.target.closest('.edit') && tagFor) openCard('edit', tagFor); });
 // ---------- music ----------
 function drawMusicBtn() { const on = music.isOn(); $('bMusic').innerHTML = `<svg viewBox="0 0 24 24"><path d="M9 17V6l10-2v11" fill="none"/><circle cx="6.5" cy="17.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/><circle cx="16.5" cy="15.5" r="2.6" fill="${on ? '#B58BD9' : '#FFF3D6'}"/>${on ? '' : '<path d="M4 4l16 16" stroke="#E8604C"/>'}</svg>`;
@@ -444,10 +452,10 @@ async function openDiary(at, span, fromEnd) {
   people.sort((a, b) => b.name.length - a.name.length);
   openBook({ host: $('bookPages'), nav: $('bookNav'), entries, hasEarlier, photos: S.photos || [], people, dayLabel, at: typeof at === 'number' ? at : null, fromEnd,
     onEarlier: () => openDiary(null, span + 240, bookCount()),
-    backCover: `<div class="about"><h3>About this diary</h3><p>It lives in this browser only, so it stays private to you and your baos.</p>
-      <button data-act="update">check for updates</button><button data-act="export">keep a copy</button><button data-act="import">restore a copy</button><small>swipe left to close the book</small></div>`,
-    onAct: (a, el) => { if (a === 'update') checkForUpdates(el); if (a === 'export') exportCopy(); if (a === 'import') $('importFile').click(); },
-    onClose: () => closeDiary(),
+    backCover: `<div class="about"><h3>Your community</h3><p>The whole community (every bao, the house, the photos and this diary) lives in this browser only, so it stays private to you.</p>
+      <p>To keep it safe, or to move it to another device, save a copy:</p>
+      <button data-act="export">save a copy of the community</button><button data-act="import">restore the community from a copy</button><small>swipe down to close the book</small></div>`,
+    onAct: (a) => { if (a === 'export') exportCopy(); if (a === 'import') $('importFile').click(); },
     onPhoto: (id) => openPhoto(id),
     onTurn: () => snd.play('page'),
     onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } } });
@@ -487,6 +495,11 @@ $('importFile').addEventListener('change', async (e) => {
 // ---------- updates ----------
 // Home-screen apps hang on to old files, so this fetches the latest ones on request and says what changed.
 const notesSince = (info, v) => info.changes.filter((c) => c.v > v).flatMap((c) => c.notes);
+// The gift box: checks quietly when the app opens, and shows a dot when there is something new.
+async function peekForUpdates() {
+  try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); const info = await r.json(); $('bGift').classList.toggle('new', info.v > VERSION); } catch (e) { /* offline: no dot */ }
+}
+$('bGift').addEventListener('click', () => { snd.unlock(); snd.play('tick'); checkForUpdates(); });
 async function checkForUpdates(link) {
   link = link || { set textContent(v) {} }; link.textContent = 'checking…';
   let info;
@@ -581,7 +594,7 @@ function boot() {
     let pool = busy.length ? busy : awake.length ? awake : ad.length ? ad : S.baos; const fresh = pool.filter((b) => b.id !== S.lastStar); if (fresh.length) pool = fresh;
     const star = pool[Math.floor(Math.random() * pool.length)]; S.lastStar = star.id; startFollow(star, true);
   }
-  announceUpdate();
+  announceUpdate(); peekForUpdates();
   if (WORKSHOP) mountWorkshop(shopApi);
   bootDay = S.tray.day; drawTray(); drawSoundBtn(); drawMusicBtn(); save();
   setInterval(save, 8000);

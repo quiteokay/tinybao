@@ -187,11 +187,10 @@ export function attachBookInput(host) {
     const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
     if (!d.turning) {
       if (Math.abs(dx) < 7 || Math.abs(dx) < Math.abs(dy)) return;
-      if (!beginTurn(dx < 0 ? 1 : -1, d.ry < B.ph / 2 ? 0 : B.ph)) { if (dx < 0 && B.opts.onClose) { d.closing = true; host.setPointerCapture(e.pointerId); } else { d = null; return; } }
-      else d.turning = true;
+      if (!beginTurn(dx < 0 ? 1 : -1, d.ry < B.ph / 2 ? 0 : B.ph)) { d = null; return; }
+      d.turning = true;
       if (d.turning) host.setPointerCapture(e.pointerId);
     }
-    if (d.closing) { B.layer.style.transform = `translateX(${Math.min(0, dx) * 0.35}px)`; d.lastDx = dx; return; }
     const T = B.T, k = B.spread ? 1 : 2, lo = Math.min(T.from.x, T.to.x), hi = Math.max(T.from.x, T.to.x);
     const px = Math.max(lo, Math.min(hi, T.from.x + dx * k)), prog = Math.abs(px - T.from.x) / (hi - lo);
     const curl = Math.sin(Math.PI * Math.min(1, prog * 1.6 + 0.02)) * B.ph * 0.16 * (T.cy === 0 ? 1 : -1) * (T.rev ? Math.sin(Math.PI * prog) : 1);
@@ -200,7 +199,6 @@ export function attachBookInput(host) {
   const up = (e) => {
     if (!d || d.id !== e.pointerId || !B) { d = null; return; }
     const g = d; d = null;
-    if (g.closing) { B.layer.style.transition = 'transform .2s'; B.layer.style.transform = ''; setTimeout(() => { if (B) B.layer.style.transition = ''; }, 220); if ((g.lastDx || 0) < -60) B.opts.onClose(); return; }
     if (g.turning && B.T) {
       const T = B.T, prog = Math.abs(T.P.x - T.from.x) / Math.abs(T.to.x - T.from.x), flick = performance.now() - g.t0 < 260 && Math.abs(g.lastDx || 0) > 30;
       const done = prog > 0.5 || flick; animateTo(done ? T.to : T.from, () => finish(done)); return;

@@ -1,5 +1,5 @@
 {
-  "v": 9,
+  "v": 10,
   "files": [
     "index.html",
     "style.css",
@@ -19,6 +19,14 @@
     "js/workshop.js"
   ],
   "changes": [
+    {
+      "v": 10,
+      "notes": [
+        "a gift box at the top shows when there is something new",
+        "names update everywhere as you type them",
+        "the diary closes with a swipe down"
+      ]
+    },
     {
       "v": 9,
       "notes": [
