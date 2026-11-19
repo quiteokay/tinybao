@@ -5,8 +5,8 @@ import { drawBaoShape } from './drawbao.js';
 import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, renameBao, plansInfo, choosePlan, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
 import * as music from './music.js';
-import { openBook, closeBook, bookOpen, bookPage, bookBusy, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
-import { usePhotoStore, putFull, getFull, delFull } from './photos.js';
+import { openBook, closeBook, bookOpen, bookPage, bookCount, bookBusy, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
+import { usePhotoStore, putFull, getFull, delFull, putDays, daysFrom, oldestDay, allDays, clearDays } from './photos.js';
 import { FLAVORS } from './drawbao.js';
 import { SIGN } from './drawsites.js';
 import { thingIcon } from './drawthings.js';
@@ -306,7 +306,7 @@ $('photoView').addEventListener('click', (e) => { if (e.target === $('photoView'
 $('pvDel').addEventListener('click', () => {
   const btn = $('pvDel'); if (!btn.classList.contains('sure')) { btn.classList.add('sure'); btn.textContent = 'really delete?'; return; }
   const p = viewing; if (!p) return; S.photos.splice(S.photos.indexOf(p), 1); delFull(p.id); save(); closePhoto(); snd.play('blip');
-  if (!$('diary').hidden) openDiary(bookPage());
+  if (!$('diary').hidden) openDiary(bookPage(), diarySpan);
 });
 swipeToClose($('photoView'), $('pvImg'), closePhoto);
 // Pull something down far enough and it closes.
@@ -417,15 +417,30 @@ function dayLabel(key) {
   const [Y, M, D] = key.split('-').map(Number);
   return new Date(Y, M - 1, D).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 }
-function openDiary(at) {
+// The save keeps the last couple of months of diary; older days move to the archive (and are never thrown away).
+const RECENT_DAYS = 60;
+let archiving = false;
+async function archiveOld() {
+  if (archiving) return; const cutoff = dayKey(clock.t - RECENT_DAYS * 86400000), old = S.diary.filter((e) => e.d < cutoff);
+  if (!old.length) return; archiving = true;
+  if (await putDays(old)) { S.diary = S.diary.filter((e) => e.d >= cutoff); save(); } // only removed once safely written
+  archiving = false;
+}
+let diarySpan = RECENT_DAYS, opening = 0;
+async function openDiary(at, span, fromEnd) {
+  const ticket = ++opening; span = span || RECENT_DAYS; diarySpan = span; $('diary').hidden = false;
+  const from = dayKey(clock.t - span * 86400000), older = await daysFrom(from), oldest = await oldestDay();
+  if (ticket !== opening || $('diary').hidden) return;
+  const entries = older.concat(S.diary).filter((e) => e.d >= from).sort((a, b) => a.t - b.t);
+  const hasEarlier = (oldest && oldest < from) || S.diary.some((e) => e.d < from);
   const who = S.baos.find((b) => b.id === S.diarist);
   $('diaryTitle').textContent = who ? `${who.name}’s diary` : 'The diary';
   // everyone who might be mentioned: residents in their own colour, old friends in a quiet brown
   const people = S.baos.map((b) => ({ name: b.name, id: b.id, color: NAME_INK[b.flavor] || '#8a6a4a' }));
   for (const n of S.everNames || []) if (!people.some((p) => p.name === n)) people.push({ name: n, id: null, color: '#8a7a72' });
   people.sort((a, b) => b.name.length - a.name.length);
-  $('diary').hidden = false;
-  openBook({ host: $('bookPages'), nav: $('bookNav'), entries: S.diary.slice(-400), photos: S.photos || [], people, dayLabel, at: typeof at === 'number' ? at : null,
+  openBook({ host: $('bookPages'), nav: $('bookNav'), entries, hasEarlier, photos: S.photos || [], people, dayLabel, at: typeof at === 'number' ? at : null, fromEnd,
+    onEarlier: () => openDiary(null, span + 240, bookCount()),
     onPhoto: (id) => openPhoto(id),
     onTurn: () => snd.play('page'),
     onName: (id) => { const b = S.baos.find((q) => q.id === id); closeDiary(); if (b) { startFollow(b); snd.play('blip'); } } });
@@ -437,14 +452,15 @@ $('bDiary').addEventListener('click', () => openDiary());
 swipeToClose($('diary'), document.querySelector('#diary .book'), () => closeDiary(), bookBusy);
 $('diaryClose').addEventListener('click', closeDiary);
 $('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) closeDiary(); });
-window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(bookPage()); });
-$('exportBtn').addEventListener('click', (e) => { e.preventDefault(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([serialize()], { type: 'application/json' })); a.download = `tinybao-community-${dayKey(clock.t)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
+window.addEventListener('resize', () => { if (!$('diary').hidden) openDiary(bookPage(), diarySpan); });
+$('exportBtn').addEventListener('click', async (e) => { e.preventDefault(); const data = JSON.parse(serialize()); data.diary = (await allDays()).concat(data.diary); // the whole diary goes in the copy
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' })); a.download = `tinybao-community-${dayKey(clock.t)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); });
 $('importBtn').addEventListener('click', (e) => { e.preventDefault(); $('importFile').click(); });
 $('importFile').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
   try { const d = JSON.parse(await f.text()); if (!Array.isArray(d.floors) || !Array.isArray(d.baos)) throw 0;
     if (!confirm('Replace the community in this browser with the one in this file?')) return;
-    localStorage.setItem(KEY, JSON.stringify(d)); location.reload();
+    await clearDays(); localStorage.setItem(KEY, JSON.stringify(d)); location.reload(); // old days are archived again after loading
   } catch (err) { alert('That file does not look like a saved community.'); }
 });
 
@@ -535,6 +551,7 @@ function boot() {
   announceUpdate();
   bootDay = S.tray.day; drawTray(); drawSoundBtn(); drawMusicBtn(); save();
   setInterval(save, 8000);
+  archiveOld(); setInterval(archiveOld, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
   if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, music, VERSION, plansInfo, takePhoto, takeShot, getFull, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };

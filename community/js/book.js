@@ -39,6 +39,7 @@ function paginate(o, pw, ph) {
   };
   const days = {}; for (const e of o.entries) (days[e.d] = days[e.d] || []).push(e);
   const keys = Object.keys(days).sort();
+  if (o.hasEarlier) put('<button class="earlier">↑ read earlier days</button>');
   if (!keys.length) put('<p class="empty">Nothing written yet.</p>');
   for (const k of keys) {
     put(`<h3>${esc(o.dayLabel(k))}</h3>`);
@@ -81,7 +82,7 @@ function layoutStatic() {
   const L = B.layer; L.innerHTML = '';
   if (B.spread) { L.appendChild(el('pg-left', pageHtml(B.i) ?? '', 0)); L.appendChild(el('pg-right', pageHtml(B.i + 1) ?? '', B.pw)); }
   else L.appendChild(el('', pageHtml(B.i) ?? '', 0));
-  B.nav.textContent = B.spread ? `${B.i + 1}–${Math.min(B.i + 2, B.pages.length)} of ${B.pages.length}` : `${B.i + 1} of ${B.pages.length}`;
+  B.nav.textContent = B.spread && B.i + 1 < B.pages.length ? `${B.i + 1}–${B.i + 2} of ${B.pages.length}` : `${B.i + 1} of ${B.pages.length}`;
 }
 // Set up the elements for a turn in direction dir (+1 forward, -1 back).
 function beginTurn(dir, cy) {
@@ -158,13 +159,14 @@ export function openBook(opts) {
   const layer = document.createElement('div'); layer.className = 'layer'; host.style.width = (spread ? pw * 2 : pw) + 'px'; host.style.height = ph + 'px'; host.appendChild(layer);
   B = { host, layer, pw, ph, spread, opts, nav: opts.nav, T: null, anim: false };
   const { pages, lastText } = paginate({ ...opts, host }, pw, ph);
-  const at = opts.at != null ? Math.min(opts.at, pages.length - 1) : lastText;
+  const at = opts.fromEnd != null ? Math.max(0, pages.length - opts.fromEnd - 1) : opts.at != null ? Math.min(opts.at, pages.length - 1) : lastText;
   B.pages = pages; B.i = spread ? at - (at % 2) : at;
   host.classList.toggle('spread', spread);
   layoutStatic();
 }
 export const bookOpen = () => !!B;
 export const bookPage = () => (B ? B.i : null);
+export const bookCount = () => (B ? B.pages.length : 0);
 export const bookBusy = () => !!(B && (B.T || B.anim));
 export function closeBook() { B = null; }
 
@@ -196,6 +198,7 @@ export function attachBookInput(host) {
       const done = prog > 0.5 || flick; animateTo(done ? T.to : T.from, () => finish(done)); return;
     }
     if (e.type !== 'pointerup' || Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 10) return;
+    if (e.target.closest && e.target.closest('.earlier')) { B.opts.onEarlier(); return; }
     const name = e.target.closest && e.target.closest('.nm.live');
     if (name) { B.opts.onName(name.dataset.id); return; }
     const fig = e.target.closest && e.target.closest('figure[data-photo]');

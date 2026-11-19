@@ -213,7 +213,8 @@ export function log(S, type, d = {}, opt = {}) {
     .replace(/^I says/, 'I say').replace(/^I thinks/, 'I think').replace(/^I is/, 'I am').replace(/^I blames/, 'I blame');
   const e = { t, d: dayKey(t), text: text.trim(), k: type, i: idx, a: actorOf(d) };
   S.diary.push(e);
-  if (S.diary.length > 400) S.diary.splice(0, S.diary.length - 400);
+  // older days are moved into the archive by the page (see archiveOld in main.js); this is only a last-resort ceiling
+  if (S.diary.length > 6000) S.diary.splice(0, S.diary.length - 6000);
   if (opt.t != null) S.diary.sort((a, b) => a.t - b.t);
   return e;
 }

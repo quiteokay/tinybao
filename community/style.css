@@ -65,6 +65,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: none; backgroun
 .page p.empty { opacity: .6; font-style: italic; }
 .page .pno { position: absolute; bottom: 7px; left: 0; right: 0; text-align: center; font-size: 11px; opacity: .45; }
 .nm { font-weight: 800; }
+.page .earlier { display: block; margin: 0 auto; border: 2px solid var(--ink); border-radius: 14px; background: #fff; padding: 2px 14px; font-weight: 700; font-size: 13px; line-height: 24px; }
 .nm.live { cursor: pointer; text-decoration: underline dotted 1.5px; text-underline-offset: 3px; }
 .photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 6px; }
 .photos figure { background: #fff; padding: 6px 6px 4px; border: 1.5px solid rgba(58,42,34,.35); box-shadow: 0 2px 4px rgba(0,0,0,.12); transform: rotate(-1.2deg); }
