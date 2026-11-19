@@ -4,6 +4,12 @@ const lastPlayed = {};
 try { muted = localStorage.getItem('tinybao.sound') === 'off'; } catch (e) { /* no storage: sound stays on */ }
 
 export const isMuted = () => muted;
+// The visitor's volume, 0 to 1. Full volume is the measured level; the slider is squared so each step sounds even.
+let vol = 1;
+try { const v = parseFloat(localStorage.getItem('tinybao.soundVol')); if (v >= 0 && v <= 1) vol = v; } catch (e) { /* default full */ }
+const level = () => 0.5 * vol * vol;
+export const getVolume = () => vol;
+export function setVolume(v) { vol = Math.min(1, Math.max(0, v)); try { localStorage.setItem('tinybao.soundVol', String(vol)); } catch (e) { /* ignore */ } if (master) master.gain.value = level(); }
 export function setMuted(m) { muted = m; try { localStorage.setItem('tinybao.sound', m ? 'off' : 'on'); } catch (e) { /* ignore */ } }
 // Used while catching up on time away, when lots happens at once.
 export function setQuiet(q) { quiet = q; }
@@ -12,7 +18,7 @@ export function setQuiet(q) { quiet = q; }
 export function unlock() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.5; master.connect(ctx.destination);
+    ctx = new AC(); master = ctx.createGain(); master.gain.value = level(); master.connect(ctx.destination);
   }
   if (ctx.state === 'suspended') ctx.resume();
 }

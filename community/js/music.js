@@ -62,6 +62,15 @@ let ctx = null, out = null, verb = null, playing = false, timer = null, nextBar 
 let on = false;
 try { on = localStorage.getItem('tinybao.music') === 'on'; } catch (e) { /* default off */ }
 export const isOn = () => on;
+// The visitor's volume, 0 to 1. Full volume is the measured level (about -26 LUFS); the slider is squared so each step sounds even.
+let vol = 1;
+try { const v = parseFloat(localStorage.getItem('tinybao.musicVol')); if (v >= 0 && v <= 1) vol = v; } catch (e) { /* default full */ }
+const level = () => Math.max(0.0001, 0.3 * vol * vol);
+export const getVolume = () => vol;
+export function setVolume(v) {
+  vol = Math.min(1, Math.max(0, v)); try { localStorage.setItem('tinybao.musicVol', String(vol)); } catch (e) { /* ignore */ }
+  if (ctx && playing) { const now = ctx.currentTime; out.gain.cancelScheduledValues(now); out.gain.setValueAtTime(out.gain.value, now); out.gain.linearRampToValueAtTime(level(), now + 0.15); }
+}
 
 function setup() {
   if (ctx) return;
@@ -124,7 +133,7 @@ function start() {
   setup(); if (!ctx || playing) return;
   if (ctx.state === 'suspended') ctx.resume();
   playing = true; nextBar = 0; nextTime = ctx.currentTime + 0.15;
-  out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 2.5);
+  out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(level(), ctx.currentTime + 2.5);
   schedule(); timer = setInterval(schedule, 120);
 }
 function stop() {

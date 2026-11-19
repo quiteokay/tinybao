@@ -420,6 +420,8 @@ $('tag').addEventListener('click', (e) => { if (e.target.closest('.edit') && tag
 // ---------- settings: music, sounds, updates, and saving a copy of the community ----------
 function drawSettings() {
   $('swMusic').setAttribute('aria-checked', String(music.isOn())); $('swSound').setAttribute('aria-checked', String(!snd.isMuted()));
+  $('volMusic').value = Math.round(music.getVolume() * 100); $('volSound').value = Math.round(snd.getVolume() * 100);
+  $('volMusic').classList.toggle('off', !music.isOn()); $('volSound').classList.toggle('off', snd.isMuted());
   $('stVersion').textContent = updateReady ? 'Something new is ready!' : `You have version ${VERSION}`;
   $('stUpdate').textContent = updateReady ? 'update now' : 'check for updates'; $('stUpdate').classList.toggle('new', updateReady);
 }
@@ -431,6 +433,10 @@ $('stDone').addEventListener('click', closeSettings);
 $('settings').addEventListener('click', (e) => { if (e.target === $('settings') && performance.now() - +$('settings').dataset.at > 450) closeSettings(); });
 $('swMusic').addEventListener('click', () => { snd.unlock(); music.setOn(!music.isOn()); drawSettings(); });
 $('swSound').addEventListener('click', () => { snd.unlock(); snd.setMuted(!snd.isMuted()); drawSettings(); snd.play('pet'); });
+// Moving a slider turns its sound on if it was off; the sound-effects slider plays a little pet when let go, to hear the level.
+$('volMusic').addEventListener('input', () => { snd.unlock(); music.setVolume($('volMusic').value / 100); if (!music.isOn()) music.setOn(true); drawSettings(); });
+$('volSound').addEventListener('input', () => { snd.unlock(); snd.setVolume($('volSound').value / 100); if (snd.isMuted()) snd.setMuted(false); drawSettings(); });
+$('volSound').addEventListener('change', () => snd.play('pet'));
 $('stUpdate').addEventListener('click', () => { closeSettings(); checkForUpdates(); });
 $('stExport').addEventListener('click', () => exportCopy());
 $('stImport').addEventListener('click', () => $('importFile').click());
