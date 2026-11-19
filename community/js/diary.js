@@ -101,7 +101,7 @@ const T = {
   bloom: ['The flowers in the garden came up. {a} noticed first.'],
   paint: ['{a} painted the {room}. Nobody asked {a} to.', '{a} repainted the {room}. It is very bright now.'],
   drawing: ['{a} made a picture and hung it in the {room}.', '{a} painted something. We put it on the wall.'],
-  scribble: ['Somebody drew on the wall in the {room}. {a} looks very innocent.', 'There is a new scribble on the wall in the {room}. {a} was seen nearby, humming.',
+  scribble: ['Somebody drew on the wall in the {room}. {a} looks very innocent.', 'There is a new scribble on the wall in the {room}. {a} was nearby, humming, and would not say why.',
     'The wall in the {room} has been decorated. {a} says it was like that already.', 'More crayon in the {room}. I am not naming names. It was {a}.',
     'A small masterpiece appeared at bao height in the {room}. {a} has crayon on one cheek.'],
   tidy: ['{a} carried {thing} to the {room}, where it belongs.', '{a} put {thing} away in the {room}.'],
@@ -109,7 +109,7 @@ const T = {
   teddy: ['{baby} will not let go of the teddy.'],
   fish: ['{a} fed the goldfish and told it about the day.', '{a} watched the goldfish go round.'],
   telescope: ['{a} looked through the telescope for a long time and said “hm” a lot.'],
-  tea: ['{a} made tea.', '{a} and the teapot spent the afternoon together.'],
+  tea: ['{a} made tea.', '{a} spent the afternoon with the teapot.'],
   piano: ['{a} played the piano. Three notes, over and over, but nice ones.'],
   greet: ['{a} went to say hello to {b}.'],
   build_haul: ['{a} worked on {what} all morning.', '{a} hammered away at {what}.', '{a} carried planks for {what}, one at a time.', '{a} put in a long shift on {what}.',
@@ -173,6 +173,18 @@ const T = {
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
+// When the diary's writer is in a sentence their name becomes "I"; these keep the grammar right ("I keep", "showed me", "Sago and I").
+function firstPerson(s) {
+  return s.replace(/\b(to|for|with|showed|gave|tell|saw|asked|called|got|behind|at|about|helped|followed|beside) I\b/g, '$1 me')
+    .replace(/\bwas I([,.!])/g, 'was me$1')
+    .replace(/\bI and ([A-Z][\w’'-]*)/g, '$1 and I')
+    .replace(/\bI (always |also |still |just |never |really )?([a-z]+)\b/g, (m, adv = '', v) => {
+      if (/^(was|as|this|plus|yes|us|always|perhaps|sometimes|afterwards|besides|unless|less)$/.test(v) || /ss$/.test(v) || !/s$/.test(v)) return m;
+      const base = v === 'does' ? 'do' : v === 'goes' ? 'go' : /ies$/.test(v) ? v.slice(0, -3) + 'y' : /(ch|sh|x|zz)es$/.test(v) ? v.slice(0, -2) : v.slice(0, -1);
+      return 'I ' + adv + base;
+    });
+}
+
 export function entryText(S, type, d = {}) {
   const list = T[type] || ['…'];
   const usedLately = S.diary.filter((e) => e.k === type).slice(-Math.min(4, list.length - 1)).map((e) => e.i);
@@ -193,6 +205,9 @@ export function entryText(S, type, d = {}) {
     .replace(/\bI thinks\b/g, 'I think').replace(/\bI blames\b/g, 'I blame').replace(/\bI looks\b/g, 'I look')
     .replace(/like I\b/g, 'like me').replace(/asked I\b/g, 'asked me').replace(/find I\b/g, 'find me').replace(/expect I will/g, 'expect I will')
     .replace(/^I and ([A-Z]\w+(?: [A-Z]\w+)?) /, '$1 and I ').replace(/of I\b/g, 'of me').replace(/was I\./g, 'was me.').replace(/woke I\b/g, 'woke me').replace(/told I\b/g, 'told me').replace(/and I were/g, 'and I were');
+  s = firstPerson(s);
+  const mine = (x) => x && typeof x === 'object' && x.id === me;
+  if (mine(d.a) || mine(d.b)) s = s.replace(/\btheir picture\b/g, 'our picture').replace(/the two of them/g, 'the two of us');
   return s;
 }
 
@@ -263,6 +278,7 @@ export function logPhoto(S, inShot, room) {
 }
 // Tidy older diaries: several photo entries on one day become one; exact repeats on a day go.
 export function compactDiary(S) {
+  for (const e of S.diary) if (e.text && /\bI\b/.test(e.text)) e.text = firstPerson(e.text);
   const names = [...new Set([...(S.everNames || []), ...S.baos.map((b) => b.name)])], keep = [], seenText = new Set(), firstPhoto = {};
   for (const e of S.diary) {
     if (PHOTO_KINDS.includes(e.k)) { // every photo counts, even when two old entries happen to read the same

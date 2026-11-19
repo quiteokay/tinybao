@@ -1,5 +1,5 @@
 {
-  "v": 12,
+  "v": 13,
   "files": [
     "index.html",
     "style.css",
@@ -19,6 +19,12 @@
     "js/workshop.js"
   ],
   "changes": [
+    {
+      "v": 13,
+      "notes": [
+        "the diary writer now writes about themselves properly (\"I keep\", not \"I keeps\"), old pages included"
+      ]
+    },
     {
       "v": 12,
       "notes": [
