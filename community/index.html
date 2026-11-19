@@ -9,12 +9,14 @@
   <link rel="apple-touch-icon" href="/lilbao_351.png">
   <link rel="icon" type="image/png" href="/lilbao_351.png">
   <title>tiny bao community</title>
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
   <button class="round" id="bMusic" aria-label="Music on or off"></button>
   <button class="round" id="bSound" aria-label="Sound on or off"></button>
+  <button id="plans" aria-label="What the baos are building"></button>
+  <div id="plansCard" hidden><div class="bc pc" id="pcBody"></div></div>
   <div id="tag" hidden></div>
   <div id="baoCard" hidden>
     <div class="bc">
@@ -29,7 +31,7 @@
   </div>
   <div id="photoView" hidden>
     <img id="pvImg" alt="A photo of the community">
-    <div class="pvBar"><span id="pvWhen"></span><span class="pvBtns"><button id="pvDel">delete</button><button id="pvClose" aria-label="Close">×</button></span></div>
+    <div class="pvBar"><span id="pvWhen"></span><span class="pvBtns"><button id="pvDel">delete</button><button id="pvClose" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button></span></div>
   </div>
   <div id="hint" hidden></div>
 
@@ -64,6 +66,6 @@
       </div>
     </div>
   </div>
-  <script type="module" src="js/main.js?v=6"></script>
+  <script type="module" src="js/main.js?v=7"></script>
 </body>
 </html>

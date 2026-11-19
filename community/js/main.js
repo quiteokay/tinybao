@@ -2,17 +2,18 @@
 import { RW, FH, W, OUT, BAO, clamp, clock, dayKey, hourOf } from './core.js';
 import { newState, nFloors, weatherAt, adults, ext, minFloor, nextAdded } from './world.js';
 import { drawBaoShape } from './drawbao.js';
-import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, renameBao, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
+import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, renameBao, plansInfo, choosePlan, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
 import * as music from './music.js';
 import { openBook, closeBook, bookOpen, bookPage, bookBusy, attachBookInput, turn as turnPage, NAME_INK } from './book.js';
 import { usePhotoStore, putFull, getFull, delFull } from './photos.js';
 import { FLAVORS } from './drawbao.js';
+import { SIGN } from './drawsites.js';
 import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 6; // keep in step with version.json
+const VERSION = 7; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
@@ -105,6 +106,7 @@ function hit(sx, sy) {
     if (Math.abs(p.x - b.x) < BAO * 0.52 * sz + pad && Math.abs(p.h - cy) < BAO * 0.46 * sz + pad) return { bao: b }; }
   for (let i = S.objects.length - 1; i >= 0; i--) { const o = S.objects[i]; if (o.heldBy) continue; const cy = o.floor * FH + (o.alt || 0) + (o.type === 'balloon' ? -14 : 14);
     if (Math.abs(p.x - o.x) < 16 + pad && Math.abs(p.h - cy) < 18 + pad) return { thing: o }; }
+  if (Math.abs(p.x - SIGN.x) < SIGN.w / 2 + pad && p.h > SIGN.h0 - pad && p.h < SIGN.h1 + pad && S.proj) return { sign: true };
   const f = furnAt(p.x, p.h); if (f) return { furn: f };
   return null;
 }
@@ -156,6 +158,7 @@ function pointerEnd(e) {
       petBao(b); snd.play('pet'); startFollow(b); lastTap = { t: 0, b: null };
     }
     else if (d.t && d.t.thing) { d.t.thing.sq = 0.3; snd.play('blip'); }
+    else if (d.t && d.t.sign) openPlans();
     else if (d.t && d.t.furn && armed < 0) { setHint('press and hold to move it'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (armed < 0 && !(down && down.mode === 'furn')) setHint(''); }, 1500); }
     else { const now = performance.now(); tagFor = null; if (lastTap.b === 'sky' && now - lastTap.t < 400) { follow = null; goHome = true; lastTap = { t: 0, b: null }; } else lastTap = { t: now, b: 'sky' }; }
   }
@@ -172,6 +175,7 @@ window.addEventListener('keydown', (e) => {
   if (!$('diary').hidden) { if (e.key === 'Escape') closeDiary(); else if (e.key === 'ArrowRight') turnPage(1); else if (e.key === 'ArrowLeft') turnPage(-1); return; }
   if (!$('photoView').hidden) { if (e.key === 'Escape') closePhoto(); return; }
   if (!$('baoCard').hidden) { if (e.key === 'Escape') closeCard(); return; }
+  if (!$('plansCard').hidden) { if (e.key === 'Escape') closePlans(); return; }
   if (e.key === 'Escape') setArmed(-1);
   const k = { ArrowUp: [0, 60], ArrowDown: [0, -60], ArrowLeft: [-60, 0], ArrowRight: [60, 0] }[e.key];
   if (k) { stopFollow(); V.cx += k[0] / V.s; V.cy += k[1] / V.s; clampCam(); }
@@ -322,6 +326,34 @@ function swipeToClose(area, mover, close, busy = () => false) {
   };
   area.addEventListener('pointerup', end); area.addEventListener('pointercancel', end);
 }
+// ---------- the building plans ----------
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const HAMMER = '<svg class="ic" viewBox="0 0 24 24"><path d="M4 20l8-8" stroke="#8a5a3c" stroke-width="3" stroke-linecap="round"/><rect x="9" y="3" width="11" height="6" rx="1.5" transform="rotate(45 14.5 6)" fill="#9aa3a8" stroke="#3a2a22" stroke-width="1.5"/></svg>';
+let chipAt = 0;
+function updatePlansChip(force) {
+  const now = performance.now(); if (!force && now < chipAt) return; chipAt = now + 1000;
+  const I = plansInfo(), el = $('plans'); if (!I) { el.hidden = true; return; } el.hidden = false;
+  const html = `${HAMMER}<span class="tx">${I.waiting ? 'pick what’s next!' : esc(cap(I.short))} <small>· ${I.waiting ? esc(I.choice.opts.map((o) => o.name.replace(/^an? /, '')).join(' or ')) : esc(I.eta)}</small><span class="bar"><i style="width:${Math.round(I.p * 100)}%"></i></span></span>`;
+  if (el.dataset.h !== html) { el.innerHTML = html; el.dataset.h = html; }
+  el.classList.toggle('ask', I.waiting);
+}
+function renderPlans() {
+  const I = plansInfo(); if (!I) return closePlans();
+  let h = `<h2>What the baos are building</h2><div class="now"><b>${esc(cap(I.name))}</b><span>${esc(cap(I.stage))}</span><div class="bar"><i style="width:${Math.round(I.p * 100)}%"></i></div><small>${Math.round(I.p * 100)}% · ${esc(I.eta)}</small></div>`;
+  if (I.choice) {
+    h += `<h3>${I.choice.pick ? 'Next up' : 'Next, they can’t decide between'}</h3><div class="opts">${I.choice.opts.map((o) => `<button data-id="${o.id}" class="${o.id === I.choice.pick ? 'on' : ''}">${esc(cap(o.name))}<small>${esc(o.blurb)}</small></button>`).join('')}</div>`;
+    h += `<p class="note">${I.choice.pick ? `${esc(cap(I.choice.opts.find((o) => o.id === I.choice.pick).name))} it is. They’ll start once this one is done. You can still change your mind until then.` : 'Tap one to choose. If nobody chooses by tomorrow morning, the baos will pick for themselves.'}</p>`;
+  } else h += `<p class="note">${I.more ? 'The next two ideas go up on the board when this one is a bit further along.' : 'The big list is done. Now it’s trees, flowers and odd jobs, for ever.'}</p>`;
+  h += '<div class="cardBtns"><button id="pcOk">ok</button></div>';
+  $('pcBody').innerHTML = h;
+}
+function openPlans() { renderPlans(); $('plansCard').hidden = false; $('plansCard').dataset.at = performance.now(); snd.unlock(); snd.play('page'); }
+function closePlans() { $('plansCard').hidden = true; }
+$('plans').addEventListener('click', openPlans);
+$('plansCard').addEventListener('click', (e) => {
+  const opt = e.target.closest('.opts button'); if (opt) { if (choosePlan(opt.dataset.id)) { snd.play('pet'); renderPlans(); updatePlansChip(true); save(); } return; }
+  if (e.target.closest('#pcOk') || (e.target === $('plansCard') && performance.now() - +$('plansCard').dataset.at > 450)) closePlans();
+});
 // ---------- meeting, naming and colouring a bao ----------
 const SWATCHES = ['plain', 'custard', 'peach', 'rosy', 'taro', 'sky', 'mint', 'matcha', 'wheat', 'sesame'];
 const ABOUT = { tidy: 'likes everything just so', lazy: 'is an expert napper', nosy: 'wants to know everything', mischief: 'is a bit of a scamp', doting: 'adores the baby',
@@ -465,7 +497,7 @@ function frame(now) {
   const gap = target - clock.t;
   if (gap > 150000 && !TEST) { clock.t = target; away(target - gap, target); }
   else if (gap > 0) { const n = Math.min(240, Math.ceil(gap / 100)), dt = gap / n / 1000; for (let i = 0; i < n; i++) { clock.t += dt * 1000; tick(dt); } }
-  tickParts(real); updateTrayNote(); stepCamera(real);
+  tickParts(real); updateTrayNote(); updatePlansChip(); stepCamera(real);
   // furniture lifts after a short press, so an ordinary drag still pans the view
   if (down && !down.mode && !down.moved && down.t && down.t.furn && armed < 0 && now - down.at > 380) { down.mode = 'furn'; liftFurn(down.t.furn); snd.play('pick'); setHint('drop it in any room'); canvas.style.cursor = 'grabbing'; }
   render(ctx, V, S, now / 1000);
@@ -486,7 +518,7 @@ function boot() {
   const loaded = load(); S = loaded || newState();
   const first = !loaded;
   if (first) S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
-  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what, info) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'photo') takePhoto(info.x, info.f * FH + 40, true); if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
+  init(S); R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what, info) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'photo') takePhoto(info.x, info.f * FH + 40, true); if (what === 'plans' || what === 'grounds') { updatePlansChip(true); if (!$('plansCard').hidden) renderPlans(); } if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
   window.addEventListener('resize', resize); resize();
   let from = S.lastSeen || clock.t;
   if (Q.has('skipDays')) from = clock.t - (+Q.get('skipDays') || 1) * 86400000;
@@ -505,7 +537,7 @@ function boot() {
   setInterval(save, 8000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
-  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, music, VERSION, takePhoto, takeShot, getFull, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
+  if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, music, VERSION, plansInfo, takePhoto, takeShot, getFull, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
   requestAnimationFrame(frame);
 }
 boot();

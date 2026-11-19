@@ -107,6 +107,18 @@ function tree(c, x, age, house, t, snow) {
   c.restore();
 }
 
+// The signboard: what is being built, how far along, and a "?" when there is a choice waiting.
+export const SIGN = { x: -206, w: 30, h0: 16, h1: 50 };
+function drawSign(c, S, t) {
+  const P = S.proj; if (!P) return; const x = SIGN.x;
+  ln(c, [x - 9, 0, x - 9, -26], '#8a5a3c', 2.4); ln(c, [x + 9, 0, x + 9, -26], '#8a5a3c', 2.4);
+  B(c, x - 16, -48, 32, 24, 3, '#E9C99A', 1.4); B(c, x - 12, -32, 24, 4, 2, '#fff', 0.9);
+  c.fillStyle = '#7CC96B'; c.fillRect(x - 12, -32, 24 * P.p, 4);
+  // a tiny hammer and saw
+  ln(c, [x - 8, -36, x - 3, -44], '#8a5a3c', 1.6); B(c, x - 6, -46, 6, 3, 1, '#9aa3a8', 0.8); ln(c, [x + 2, -37, x + 10, -43], '#9aa3a8', 2.2);
+  if (S.choice && !S.choice.pick) { const bob = Math.abs(Math.sin(t * 3)) * 3; c.beginPath(); c.arc(x + 14, -50 - bob, 6, 0, 7); c.fillStyle = '#FFD166'; c.fill(); c.strokeStyle = INK; c.lineWidth = 1.2; c.stroke();
+    c.fillStyle = INK; c.font = '900 9px ui-rounded, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', x + 14, -49.5 - bob); }
+}
 // Everything out in the grounds.
 export function drawGrounds(c, S, t) {
   LIGHTS.length = 0;
@@ -120,6 +132,7 @@ export function drawGrounds(c, S, t) {
   staged(c, S, 'tennis', -802, -548, tennis, t);
   staged(c, S, 'court', -512, -290, court, t);
   staged(c, S, 'porch', -62, -6, porch, t);
+  drawSign(c, S, t);
   staged(c, S, 'veg', W + 248, W + 358, veg, t);
   staged(c, S, 'patio', W + 382, W + 484, patio, t);
 }

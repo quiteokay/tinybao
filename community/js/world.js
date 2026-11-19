@@ -263,6 +263,11 @@ export const PROJ = {
   flowers:   { name: 'more flowers', short: 'the flower bed', hours: 10, x: W + 190 },
   repaint:   { name: 'a fresh coat of paint', short: 'the painting', hours: 14 },
 };
+export const BLURB = {
+  porch: 'somewhere to sit and watch the path', veg: 'beans, tomatoes and carrots', floor: 'three new rooms, and space for more baos', patio: 'a table under a big umbrella',
+  court: 'a hoop for shooting baskets', bowling: 'a bowling alley, down in a new basement', tennis: 'a court with a net and lines', lake: 'a lake, dug by hand',
+  boat: 'a dock and a little rowing boat', tree: 'a new tree for the garden', flowers: 'more flowers by the path', birdhouse: 'a birdhouse in one of the trees', repaint: 'a fresh coat of paint',
+};
 export const ORDER = ['porch', 'veg', 'floor', 'patio', 'court', 'floor', 'bowling', 'tennis', 'floor', 'lake', 'boat', 'floor', 'floor', 'floor', 'floor'];
 export const TREE_SLOTS = [-256, W + 364, -516, -846, W + 932, -878, W + 966];
 

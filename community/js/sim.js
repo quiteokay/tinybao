@@ -1,7 +1,7 @@
 // What the baos do. Each bao has hidden needs and picks its own next activity;
 // chores come from the state of the house. Nothing here is steered by the visitor.
 import { RW, FH, COLS, W, ROOMW, OUT, BAO, clamp, rand, randInt, pick, chance, uid, clock, isNight, darkness, dayKey, hourOf, seeded, hashStr } from './core.js';
-import { ROOMS, PAINTS, PROJ, ORDER, TREE_SLOTS, buildFixtures, links, nextAdded, minFloor, ext, roofFloor, nFloors, xBounds, roomAt, roomName, whereIs, roomsOf, roomSpot, bedCount, adults, babyOf,
+import { ROOMS, PAINTS, PROJ, ORDER, BLURB, TREE_SLOTS, buildFixtures, links, nextAdded, minFloor, ext, roofFloor, nFloors, xBounds, roomAt, roomName, whereIs, roomsOf, roomSpot, bedCount, adults, babyOf,
   nextNewcomer, addNewcomer, addFloor, canGrow, weatherAt, addMark, wallSpot } from './world.js';
 import { log, THINGS } from './diary.js';
 
@@ -59,6 +59,7 @@ export function initBao(b) {
 export function init(S) {
   R.S = S; R.parts = [];
   for (const [k, v] of [['furn', {}], ['done', {}], ['bare', {}], ['nopower', {}], ['trees', []], ['projIdx', 0], ['veg', 0]]) if (S[k] == null) S[k] = v;
+  if (!S.queue) S.queue = ORDER.slice(S.projIdx || 0); // saves from before the choice: carry on from where the list had got to
   if (S.build) { S.proj = { id: 'floor', p: S.build.p * 0.59 }; delete S.build; } // saves from the first version
   R.fx = buildFixtures(S);
   if (S.tray && !S.tray.bao) S.tray.bao = { used: false };
@@ -1021,31 +1022,75 @@ function siteOf(S) {
   if (P.id === 'veg' || P.id === 'flowers') return { x: d.x + rand(-40, 40), floor: 0, prop: p < 0.6 ? 'shovel' : 'can', label: 'planting' };
   return { x: d.x + rand(-36, 36), floor: 0, ...stage(P.id === 'court' || P.id === 'tennis') };
 }
+// What could be built next: the first two different ideas still on the list that can be built now.
+function candidates(S) {
+  const out = [];
+  for (const id of S.queue) { if (out.includes(id)) continue; if (id === 'floor' && !canGrow(S)) continue; if (id === 'boat' && !S.done.lake) continue; out.push(id); if (out.length === 2) break; }
+  return out;
+}
+const nextMorning = (t) => { const d = new Date(t + 12 * 3600000); d.setHours(9, 0, 0, 0); if (d.getTime() < t + 12 * 3600000) d.setDate(d.getDate() + 1); return d.getTime(); };
+function offerChoice(S, live, t) {
+  const c = candidates(S); if (c.length < 2 || S.choice) return;
+  const at = live ? clock.t : t;
+  S.choice = { opts: c, at, deadline: nextMorning(at), pick: null };
+  if (adults(S).length) log(S, 'choice_up', { a: pick(adults(S)), w1: PROJ[c[0]].name, w2: PROJ[c[1]].name }, { important: true, t: live ? undefined : t });
+  if (R.onChange) R.onChange('plans');
+}
+export function choosePlan(id) {
+  const S = R.S, ch = S.choice; if (!ch || !ch.opts.includes(id)) return false;
+  const first = !ch.pick; ch.pick = id;
+  if (first && adults(S).length) log(S, 'choice_user', { a: pick(adults(S)), what: PROJ[id].name }, { important: true });
+  if (S.proj && SMALL.includes(S.proj.id)) { S.proj = null; startNext(S, true); } // they drop the odd job and start on it
+  if (R.onChange) R.onChange('plans');
+  return true;
+}
+const SMALL = ['tree', 'birdhouse', 'flowers', 'repaint'];
+function filler(S) {
+  const P = { id: null, p: 0 }, n = (S.fillN = (S.fillN || 0) + 1), slot = TREE_SLOTS.find((x) => !S.trees.some((tr) => tr.x === x)), bare = S.trees.find((tr) => !tr.house);
+  P.id = n % 3 === 1 && slot != null ? 'tree' : n % 3 === 2 && bare && S.trees.filter((tr) => tr.house).length < 4 ? 'birdhouse' : n % 3 === 0 && S.flowers.length < 14 ? 'flowers' : 'repaint';
+  if (P.id === 'tree') P.x = slot; if (P.id === 'birdhouse') P.x = bare.x;
+  if (P.id === 'repaint') { const done = []; S.floors.forEach((row, f) => row.forEach((_, c) => { if (S.bare[f + ',' + c] == null) done.push({ f, c }); })); const r = pick(done); P.f = r.f; P.c = r.c; P.room = ROOMS[S.floors[r.f][r.c]].name; }
+  return P;
+}
 function startNext(S, live, t) {
+  const now = live ? clock.t : t, ch = S.choice;
   let id = null;
-  // once the big list is down to just more floors, do a few small jobs between each one
-  const tail = S.projIdx >= ORDER.lastIndexOf('boat') + 1, rest = (S.sinceFloor || 0) < 3;
-  if (!(tail && rest)) while (S.projIdx < ORDER.length && !id) { const k = ORDER[S.projIdx++]; if (k !== 'floor' || canGrow(S)) id = k; }
-  if (id === 'floor') S.sinceFloor = 0; else if (tail) S.sinceFloor = (S.sinceFloor || 0) + 1;
-  const P = { id, p: 0 };
-  if (!id) {
-    // the big list is finished: keep planting, decorating and repainting for ever
-    const n = (S.fillN = (S.fillN || 0) + 1), slot = TREE_SLOTS.find((x) => !S.trees.some((tr) => tr.x === x)), bare = S.trees.find((tr) => !tr.house);
-    P.id = n % 3 === 1 && slot != null ? 'tree' : n % 3 === 2 && bare && S.trees.filter((tr) => tr.house).length < 4 ? 'birdhouse' : n % 3 === 0 && S.flowers.length < 14 ? 'flowers' : 'repaint';
-    if (P.id === 'tree') P.x = slot; if (P.id === 'birdhouse') P.x = bare.x;
-    if (P.id === 'repaint') { const done = []; S.floors.forEach((row, f) => row.forEach((_, c) => { if (S.bare[f + ',' + c] == null) done.push({ f, c }); })); const r = pick(done); P.f = r.f; P.c = r.c; P.room = ROOMS[S.floors[r.f][r.c]].name; }
-  }
+  if (ch && ch.pick) { id = ch.pick; S.choice = null; }
+  else if (ch && now >= ch.deadline) { id = ch.opts[Math.random() < 0.5 ? 0 : 1]; S.choice = null; if (adults(S).length) log(S, 'choice_baos', { a: pick(adults(S)), what: PROJ[id].name }, { important: true, t: live ? undefined : t }); }
+  else if (!ch) id = candidates(S)[0] || null;
+  // with a choice still waiting, they get on with a small job until somebody decides (or morning comes)
+  if (id) { const i = S.queue.indexOf(id); if (i >= 0) S.queue.splice(i, 1); }
+  const P = id ? { id, p: 0 } : filler(S);
   S.proj = P;
   if (P.id === 'bowling') { S.basement = true; R.fx = buildFixtures(S); if (R.onChange) R.onChange('floor'); }
   const small = ['tree', 'birdhouse', 'flowers', 'repaint'].includes(P.id);
   if (adults(S).length && (!small || P.id === 'repaint')) log(S, small ? 'repaint_start' : 'proj_start', { a: pick(adults(S)), what: PROJ[P.id].name, room: P.room }, { important: !small, p: 0.5, t: live ? undefined : t });
   if (R.onChange) R.onChange('grounds');
 }
+// For the signboard and the plans card.
+export function plansInfo() {
+  const S = R.S, P = S.proj; if (!P) return null;
+  const d = PROJ[P.id], left = (1 - P.p) * d.hours, h = clock.hour(), todayLeft = h < 6.5 ? 16 : h < 22.5 ? 22.5 - h : 0;
+  let eta; if (left <= todayLeft) eta = 'done today'; else { const days = Math.ceil((left - todayLeft) / 16); eta = days <= 1 ? 'done tomorrow' : `about ${days} days to go`; }
+  const p = P.p, stage = P.id === 'floor' ? (p < 0.6 ? 'putting up the frame' : p < 0.9 ? 'painting the new rooms' : 'wiring up the lights')
+    : ['tree', 'flowers'].includes(P.id) ? 'planting' : P.id === 'repaint' ? 'painting the ' + P.room : P.id === 'lake' ? (p < 0.85 ? 'digging' : 'filling it with water')
+    : p < 0.35 ? (['court', 'tennis', 'bowling'].includes(P.id) ? 'digging' : 'marking it out') : p < 0.7 ? 'building' : p < 0.9 ? 'painting' : 'finishing touches';
+  const ch = S.choice;
+  return { id: P.id, name: d.name, short: d.short, p, stage, eta, waiting: !!(ch && !ch.pick), choice: ch && { opts: ch.opts.map((id) => ({ id, name: PROJ[id].name, blurb: BLURB[id] })), pick: ch.pick, deadline: ch.deadline }, more: S.queue.length > 0 };
+}
 const crossed = (a, b, th) => a < th && b >= th;
 function advance(S, hours, live, t) {
   if (!S.proj) startNext(S, live, t);
+  // morning came and nobody chose: the baos decide, and leave any odd job to start on it
+  const ch = S.choice, now = live ? clock.t : t;
+  if (ch && !ch.pick && now >= ch.deadline) {
+    ch.pick = ch.opts[Math.random() < 0.5 ? 0 : 1];
+    if (adults(S).length) log(S, 'choice_baos', { a: pick(adults(S)), what: PROJ[ch.pick].name }, { important: true, t: live ? undefined : t });
+    if (SMALL.includes(S.proj.id)) { S.proj = null; startNext(S, live, t); }
+  }
   const P = S.proj, d = PROJ[P.id], a = P.p, lt = live ? undefined : t, who = adults(S).length ? pick(adults(S)) : null;
   P.p = Math.min(1, a + hours / d.hours); const p = P.p;
+  if (crossed(a, p, 0.6)) offerChoice(S, live, t); // the next two ideas go up on the board
   if (P.id === 'floor') {
     if (crossed(a, p, 0.6)) {
       const row = addFloor(S); P.f = S.floors.length - 1; R.fx = buildFixtures(S);

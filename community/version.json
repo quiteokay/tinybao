@@ -1,5 +1,5 @@
 {
-  "v": 6,
+  "v": 7,
   "files": [
     "index.html",
     "style.css",
@@ -18,6 +18,14 @@
     "js/photos.js"
   ],
   "changes": [
+    {
+      "v": 7,
+      "notes": [
+        "a signboard shows what the baos are building and how many days to go",
+        "when they can't decide what to build next, you get to pick one of two",
+        "the close button on photos sits straight now"
+      ]
+    },
     {
       "v": 6,
       "notes": [
