@@ -9,18 +9,21 @@ import { openBook, closeBook, bookOpen, bookPage, bookCount, bookBusy, attachBoo
 import { usePhotoStore, putFull, getFull, delFull, putDays, daysFrom, oldestDay, allDays, clearDays } from './photos.js';
 import { FLAVORS } from './drawbao.js';
 import { SIGN } from './drawsites.js';
+import { inWorkshop, openDoor, mountWorkshop, shopClock, saveShopClock, workshopTick } from './workshop.js';
+import * as simAll from './sim.js';
 import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 7; // keep in step with version.json
+const VERSION = 8; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
 const TEST = ['speed', 'skipDays', 'hour', 'fresh', 'test'].some((k) => Q.has(k));
+const WORKSHOP = !TEST && inWorkshop(); // hidden testing workshop, on its own copy of the community
 if (Q.has('u') && history.replaceState) history.replaceState(null, '', location.pathname + (TEST ? '?test' : '')); // tidy the address after an update
-const KEY = 'tinybao.community.v1' + (TEST ? '.test' : '');
-usePhotoStore(TEST ? '-test' : '');
+const KEY = 'tinybao.community.v1' + (TEST ? '.test' : WORKSHOP ? '.workshop' : '');
+usePhotoStore(TEST ? '-test' : WORKSHOP ? '-workshop' : '');
 const canvas = $('c'), ctx = canvas.getContext('2d');
 let S, V = { vw: 0, vh: 0, dpr: 1, s: 1, cx: W / 2, cy: 0, gy: 0, wx0: 0, wx1: 0 }, baseS = 1;
 
@@ -33,7 +36,7 @@ function serialize() {
     return { id: o.id, type: o.type, x: Math.round(x), floor, uses: o.uses, water: o.water, t: o.t, unseen: o.unseen, hue: o.hue }; });
   return JSON.stringify(out);
 }
-function save() { try { localStorage.setItem(KEY, serialize()); } catch (e) { /* private mode or full: carry on without saving */ } }
+function save() { if (WORKSHOP && clock.t) saveShopClock({ ...shopClock(), offset: clock.t - Date.now(), speed: clock.speed }); try { localStorage.setItem(KEY, serialize()); } catch (e) { /* private mode or full: carry on without saving */ } }
 function load() {
   if (Q.has('fresh')) return null;
   try { const raw = localStorage.getItem(KEY); if (!raw) return null; const d = JSON.parse(raw); if (!d || !Array.isArray(d.floors) || !Array.isArray(d.baos)) return null; migrate(d); return Object.assign(newState0(), d); } catch (e) { return null; }
@@ -247,7 +250,7 @@ function trayDown(e, i, el) {
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 }
 
-$('bCam').addEventListener('click', () => { snd.unlock(); setArmed(-1); takeShot(); });
+$('bCam').addEventListener('click', () => { if (swallowed()) return; snd.unlock(); setArmed(-1); takeShot(); });
 // ---------- photos ----------
 // The camera keeps exactly what is on screen. The save holds a small preview; the full photo goes in IndexedDB.
 const thumbCanvas = document.createElement('canvas'), fullCanvas = document.createElement('canvas');
@@ -448,7 +451,22 @@ async function openDiary(at, span, fromEnd) {
 }
 function closeDiary() { $('diary').hidden = true; closeBook(); }
 attachBookInput($('bookPages'));
-$('bDiary').addEventListener('click', () => openDiary());
+// ---------- the hidden door to the workshop ----------
+const chord = { d: -1e9, c: -1e9, first: -1e9, n: 0, swallow: -1e9 };
+const zoomedOut = () => V.s <= minS() * 1.03;
+function chordDown(which) {
+  const now = performance.now(); chord[which] = now;
+  if (now - chord[which === 'd' ? 'c' : 'd'] > 260) return; // both pressed at once
+  chord.swallow = now;
+  if (now - chord.first > 2000) { chord.first = now; chord.n = 1; } else chord.n++;
+  if (chord.n >= 2 && zoomedOut()) { chord.n = 0; openDoor(shopApi); }
+}
+const swallowed = () => performance.now() - chord.swallow < 800; // the chord's own taps don't open the diary or take a photo
+$('bDiary').addEventListener('pointerdown', () => chordDown('d'));
+$('bCam').addEventListener('pointerdown', () => chordDown('c'));
+let typed = '';
+window.addEventListener('keydown', (e) => { if (e.key.length !== 1 || (e.target.closest && e.target.closest('input'))) return; typed = (typed + e.key.toLowerCase()).slice(-4); if (typed === 'shop' && zoomedOut()) { typed = ''; openDoor(shopApi); } });
+$('bDiary').addEventListener('click', () => { if (!swallowed()) openDiary(); });
 swipeToClose($('diary'), document.querySelector('#diary .book'), () => closeDiary(), bookBusy);
 $('diaryClose').addEventListener('click', closeDiary);
 $('diary').addEventListener('pointerdown', (e) => { if (e.target === $('diary')) closeDiary(); });
@@ -509,11 +527,11 @@ function away(from, to) {
 let last = performance.now(), bootDay = '';
 function frame(now) {
   const real = Math.min(0.25, (now - last) / 1000); last = now;
-  const target = TEST ? clock.t + real * 1000 * clock.speed : Date.now();
+  const target = TEST || WORKSHOP ? clock.t + real * 1000 * clock.speed : Date.now();
   const gap = target - clock.t;
-  if (gap > 150000 && !TEST) { clock.t = target; away(target - gap, target); }
+  if (gap > 150000 && !TEST && !WORKSHOP) { clock.t = target; away(target - gap, target); }
   else if (gap > 0) { const n = Math.min(240, Math.ceil(gap / 100)), dt = gap / n / 1000; for (let i = 0; i < n; i++) { clock.t += dt * 1000; tick(dt); } }
-  tickParts(real); updateTrayNote(); updatePlansChip(); stepCamera(real);
+  tickParts(real); updateTrayNote(); updatePlansChip(); stepCamera(real); if (WORKSHOP) workshopTick(shopApi);
   // furniture lifts after a short press, so an ordinary drag still pans the view
   if (down && !down.mode && !down.moved && down.t && down.t.furn && armed < 0 && now - down.at > 380) { down.mode = 'furn'; liftFurn(down.t.furn); snd.play('pick'); setHint('drop it in any room'); canvas.style.cursor = 'grabbing'; }
   render(ctx, V, S, now / 1000);
@@ -527,10 +545,24 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// ---------- the workshop's handles ----------
+const shopApi = {
+  S: () => S, clock, sim: simAll, save, drawTray, takeShot,
+  hint: (t) => { setHint(t); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (armed < 0) setHint(''); }, 1500); },
+  centre: () => toWorld(V.vw / 2, V.gy * 0.6),
+  skip: (ms) => { const from = clock.t; clock.t += ms; if (ms >= 20 * 60000) away(from, clock.t); else settle(); save(); },
+  card: (k) => {
+    if (k === 'first') showCard('The tiny bao community', ['They get on with things by themselves.', 'You can pet them, pick them up and put them somewhere else, and drop in today’s things to see what they make of them.'], false);
+    if (k === 'away') showCard('While you were away', S.diary.slice(-4).map((e) => e.text), true);
+    if (k === 'update') fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.json()).then((info) => showCard('Updated!', ['The community has had some work done:'].concat(notesSince(info, VERSION - 1).map((n) => '• ' + n)), false)).catch(() => {});
+  },
+};
 // ---------- start ----------
 function boot() {
   if (Q.has('speed')) clock.speed = clamp(+Q.get('speed') || 1, 0.1, 5000);
+  if (WORKSHOP) { const g = shopClock(); clock.speed = g.speed || 1; }
   if (Q.has('hour')) { const want = +Q.get('hour'), d = new Date(); d.setHours(Math.floor(want), Math.round((want % 1) * 60), 0, 0); clock.t = d.getTime(); } else clock.t = Date.now();
+  if (WORKSHOP) clock.t = Date.now() + (shopClock().offset || 0); // the test copy keeps its own clock
   const loaded = load(); S = loaded || newState();
   const first = !loaded;
   if (first) S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
@@ -549,6 +581,7 @@ function boot() {
     const star = pool[Math.floor(Math.random() * pool.length)]; S.lastStar = star.id; startFollow(star, true);
   }
   announceUpdate();
+  if (WORKSHOP) mountWorkshop(shopApi);
   bootDay = S.tray.day; drawTray(); drawSoundBtn(); drawMusicBtn(); save();
   setInterval(save, 8000);
   archiveOld(); setInterval(archiveOld, 5 * 60000);

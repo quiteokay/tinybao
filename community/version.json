@@ -1,5 +1,5 @@
 {
-  "v": 7,
+  "v": 8,
   "files": [
     "index.html",
     "style.css",
@@ -15,9 +15,16 @@
     "js/sound.js",
     "js/music.js",
     "js/book.js",
-    "js/photos.js"
+    "js/photos.js",
+    "js/workshop.js"
   ],
   "changes": [
+    {
+      "v": 8,
+      "notes": [
+        "little fixes and tidying behind the scenes"
+      ]
+    },
     {
       "v": 7,
       "notes": [

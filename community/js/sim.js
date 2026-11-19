@@ -736,7 +736,8 @@ function landedBao(S, b) {
 export function dropBao(x, h, pick) {
   const S = R.S, base = nextAdded(S); if (!base) return null;
   const spec = { ...base, ...(pick || {}) };
-  (S.usedAdded = S.usedAdded || []).push(base.name);
+  (S.usedAdded = S.usedAdded || []).push(pick && pick.listName ? pick.listName : base.name); // the workshop can bring in a particular bao from the list
+  delete spec.listName;
   const b = addNewcomer(S, spec, false); initBao(b);
   const f = landFloor(S, x, h), [lo, hi] = xBounds(S, f);
   Object.assign(b, { x: clamp(x, lo, hi), floor: f, alt: Math.max(0, h - f * FH), fall: true, vy: 0, hand: true });
@@ -1036,6 +1037,26 @@ function offerChoice(S, live, t) {
   S.choice = { opts: c, at, deadline: nextMorning(at), pick: null };
   if (adults(S).length) log(S, 'choice_up', { a: pick(adults(S)), w1: PROJ[c[0]].name, w2: PROJ[c[1]].name }, { important: true, t: live ? undefined : t });
   if (R.onChange) R.onChange('plans');
+}
+// ---------- workshop only ----------
+export function shopBuild(what, id) {
+  const S = R.S;
+  if (what === 'finish' && S.proj) { const P = S.proj; advance(S, (1 - P.p) * PROJ[P.id].hours + 0.01, true); }
+  if (what === 'choice') { S.choice = null; offerChoice(S, true); }
+  if (what === 'start' && PROJ[id]) {
+    S.choice = null; const i = S.queue.indexOf(id); if (i >= 0) S.queue.splice(i, 1);
+    if (S.proj && S.proj.id === 'floor' && S.proj.f != null) { delete S.nopower[S.proj.f]; for (let c = 0; c < COLS; c++) delete S.bare[S.proj.f + ',' + c]; R.fx = buildFixtures(S); }
+    S.proj = { id, p: 0 };
+    if (id === 'bowling') { S.basement = true; R.fx = buildFixtures(S); if (R.onChange) R.onChange('floor'); }
+    if (adults(S).length) log(S, 'proj_start', { a: pick(adults(S)), what: PROJ[id].name }, { important: true });
+    if (R.onChange) R.onChange('grounds');
+  }
+}
+export function shopArrive() {
+  const S = R.S; if (nextNewcomer(S)) return arrive(S, true);
+  const spec = nextAdded(S); if (!spec) return; (S.usedAdded = S.usedAdded || []).push(spec.name);
+  const b = addNewcomer(S, { ...spec, from: 'out of nowhere, smiling' }, true); initBao(b); log(S, 'arrival', { a: b, from: 'out of nowhere, smiling' }, { important: true });
+  setPlan(b, [go(-36, 0), act(1.6, { pose: 'jump', expr: 'joy' }), go(roomSpot({ f: 0, c: 1 }), 0)], 'arrive', 'moving in');
 }
 export function choosePlan(id) {
   const S = R.S, ch = S.choice; if (!ch || !ch.opts.includes(id)) return false;
