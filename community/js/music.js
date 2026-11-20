@@ -69,7 +69,13 @@ const level = () => Math.max(0.0001, 0.3 * vol * vol);
 export const getVolume = () => vol;
 export function setVolume(v) {
   vol = Math.min(1, Math.max(0, v)); try { localStorage.setItem('tinybao.musicVol', String(vol)); } catch (e) { /* ignore */ }
-  if (ctx && playing) { const now = ctx.currentTime; out.gain.cancelScheduledValues(now); out.gain.setValueAtTime(out.gain.value, now); out.gain.linearRampToValueAtTime(level(), now + 0.15); }
+  if (ctx && playing) { const now = ctx.currentTime; hold(out.gain, now); out.gain.setTargetAtTime(level(), now, 0.03); }
+}
+// Stop any fade where it is, so the next change starts from what is actually playing. Safari can report a stale
+// gain.value mid-fade, which made every slider step snap back and start over, so use cancelAndHoldAtTime where there is one.
+function hold(p, now) {
+  if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(now);
+  else { p.cancelScheduledValues(now); p.setValueAtTime(p.value, now); }
 }
 
 function setup() {
@@ -133,12 +139,12 @@ function start() {
   setup(); if (!ctx || playing) return;
   if (ctx.state === 'suspended') ctx.resume();
   playing = true; nextBar = 0; nextTime = ctx.currentTime + 0.15;
-  out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(out.gain.value, ctx.currentTime); out.gain.linearRampToValueAtTime(level(), ctx.currentTime + 2.5);
+  hold(out.gain, ctx.currentTime); out.gain.linearRampToValueAtTime(level(), ctx.currentTime + 2.5);
   schedule(); timer = setInterval(schedule, 120);
 }
 function stop() {
   if (!ctx || !playing) return; playing = false; clearInterval(timer);
-  const now = ctx.currentTime; out.gain.cancelScheduledValues(now); out.gain.setValueAtTime(out.gain.value, now); out.gain.linearRampToValueAtTime(0.0001, now + 0.8);
+  const now = ctx.currentTime; hold(out.gain, now); out.gain.linearRampToValueAtTime(0.0001, now + 0.8);
   setTimeout(() => { if (!playing && ctx.state === 'running') ctx.suspend(); }, 1000);
 }
 export function setOn(v) { on = v; try { localStorage.setItem('tinybao.music', v ? 'on' : 'off'); } catch (e) { /* ignore */ } if (v) start(); else stop(); }

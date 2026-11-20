@@ -9,7 +9,9 @@ let vol = 1;
 try { const v = parseFloat(localStorage.getItem('tinybao.soundVol')); if (v >= 0 && v <= 1) vol = v; } catch (e) { /* default full */ }
 const level = () => 0.5 * vol * vol;
 export const getVolume = () => vol;
-export function setVolume(v) { vol = Math.min(1, Math.max(0, v)); try { localStorage.setItem('tinybao.soundVol', String(vol)); } catch (e) { /* ignore */ } if (master) master.gain.value = level(); }
+export function setVolume(v) { vol = Math.min(1, Math.max(0, v)); try { localStorage.setItem('tinybao.soundVol', String(vol)); } catch (e) { /* ignore */ } if (master) glide(); }
+// Glide to the new level over a few milliseconds. Setting gain.value directly is smoothed slowly (or held back) in Safari.
+function glide() { const now = ctx.currentTime, g = master.gain; if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(now); else g.cancelScheduledValues(now); g.setTargetAtTime(level(), now, 0.015); }
 export function setMuted(m) { muted = m; try { localStorage.setItem('tinybao.sound', m ? 'off' : 'on'); } catch (e) { /* ignore */ } }
 // Used while catching up on time away, when lots happens at once.
 export function setQuiet(q) { quiet = q; }

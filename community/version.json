@@ -1,5 +1,5 @@
 {
-  "v": 14,
+  "v": 15,
   "files": [
     "index.html",
     "style.css",
@@ -21,6 +21,12 @@
     "fonts/PatrickHand-latin.woff2"
   ],
   "changes": [
+    {
+      "v": 15,
+      "notes": [
+        "the volume sliders change the sound straight away in Safari too"
+      ]
+    },
     {
       "v": 14,
       "notes": [
