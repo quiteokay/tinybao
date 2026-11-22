@@ -1,5 +1,5 @@
 {
-  "v": 15,
+  "v": 16,
   "files": [
     "index.html",
     "style.css",
@@ -18,9 +18,18 @@
     "js/workshop.js",
     "js/notebook.js",
     "js/doodles.js",
-    "fonts/PatrickHand-latin.woff2"
+    "fonts/PatrickHand-latin.woff2",
+    "icons/apple-touch-icon.png",
+    "icons/favicon-32.png",
+    "manifest.webmanifest"
   ],
   "changes": [
+    {
+      "v": 16,
+      "notes": [
+        "a new app icon: a sleepy bao at the window, with a cup of something warm"
+      ]
+    },
     {
       "v": 15,
       "notes": [

@@ -15,7 +15,7 @@ import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 15; // keep in step with version.json
+const VERSION = 16; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
