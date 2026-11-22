@@ -605,8 +605,10 @@ function choose(S, b) {
   if (b.kind === 'baby') return chooseBaby(S, b);
   const h = clock.hour(), night = isNight(h) && b.owl < clock.t, tm = TRAITS[b.trait] || {};
   let best = null, bs = -1;
+  const wakeful = S.wakeUntil && clock.t < S.wakeUntil; // a brand-new community: nobody nods off in the first few minutes
   for (const A of ACTS) {
     const c = A.try(S, b, h); if (!c) continue;
+    if (wakeful && c.plan && c.plan.some((st) => st.sleep || st.pose === 'sleep')) continue;
     let s = c.score;
     for (const t of A.tags) if (tm[t]) s *= tm[t];
     if (night && !c.urgent) s *= 0.15;
@@ -727,6 +729,12 @@ function landedBao(S, b) {
           done: (q) => { q.needs.social = 1; log(S, 'welcome', { a: q, b }, { p: 0.6 }); } })], 'react', 'off to say hello');
       r.hurry = 1.8;
     }
+    return;
+  }
+  if (b.firstLook) { // the narrator of a new community, just moved in: stay put a while so the visitor can find them
+    b.firstLook = false;
+    setPlan(b, [act(16, { pose: 'idle', expr: 'gaze', soft: true, start: (q) => say(q, 'q', 2) }),
+      act(22, { pose: 'work', expr: 'content', soft: true, start: (q) => { q.label = 'unpacking'; say(q, 'heart', 2); } })], 'new', 'looking around');
     return;
   }
   const room = whereIs(S, b.x, b.floor);
@@ -862,7 +870,7 @@ const USE = {
     tick: (b, dt) => { if (b.st < 5) { if (chance(dt * 5)) emit('drop', o.x + rand(-5, 5), o.floor * FH + 26, { vx: 0, vy: -20, life: 0.5, s: 0.6 }); } else { b.prop = null; b.pose = 'idle'; sparkle(b, dt, ['heart', 'note', 'sun']); } },
     done: (b) => { o.water = 1; log(S, 'water', { a: b }, { p: 0.3 }); } }),
   rug: (S, o) => [...useAt(S, o, 0, 6, { label: 'rolling about on the rug', pose: 'roll', expr: 'joy' }),
-    act(8, { pose: 'sleep', expr: 'sleep', soft: true, start: (b) => { b.label = 'napping on the rug'; }, tick: (b, dt) => { if (chance(dt * 0.4)) emit('zzz', b.x + 12, hOf(b) + 30, { vx: 6, vy: 12, life: 2 }); }, done: (b) => { b.needs.energy = Math.min(1, b.needs.energy + 0.2); } })],
+    ...(S.wakeUntil && clock.t < S.wakeUntil ? [] : [act(8, { pose: 'sleep', expr: 'sleep', soft: true, start: (b) => { b.label = 'napping on the rug'; }, tick: (b, dt) => { if (chance(dt * 0.4)) emit('zzz', b.x + 12, hOf(b) + 30, { vx: 6, vy: 12, life: 2 }); }, done: (b) => { b.needs.energy = Math.min(1, b.needs.energy + 0.2); } })])],
   lamp: (S, o) => [...useAt(S, o, -22, 4, { label: 'trying the lamp', pose: 'work', expr: 'gaze', face: 1,
     tick: (b) => { const off = Math.floor(b.st / 0.55) % 2 === 1; if (off !== !!o.off) { o.off = off; sfx('tick'); } }, done: () => { o.off = false; } }),
     act(10, { pose: 'sit', expr: 'content', prop: 'book', face: 1, start: (b) => { o.off = false; b.label = 'reading by the lamp'; }, done: (b) => { b.needs.fun = 1; } })],

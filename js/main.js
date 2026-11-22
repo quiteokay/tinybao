@@ -637,13 +637,16 @@ function pickNarrator(spec, runnerUp) {
   const k = roomsOf(S, 'kitchen')[0], x = k ? k.c * RW + RW / 2 : 100;
   const b = { id: 'b' + Date.now().toString(36), name: spec.name, kind: 'adult', flavor: spec.flavor, acc: spec.acc, trait: spec.trait, x, floor: 0, arrived: clock.t,
     needs: { hunger: 0.8, energy: 0.9, fun: 0.6, social: 0.7, clean: 0.9 } };
-  initBao(b); Object.assign(b, { alt: 160, fall: true, vy: 0 });
+  initBao(b); Object.assign(b, { alt: 160, fall: true, vy: 0, firstLook: true });
   S.baos.push(b); S.everNames.push(b.name); S.diarist = b.id;
   const rest = STARTERS.filter((q) => q !== spec && q !== runnerUp);
   S.arrivals = [{ ...runnerUp, from: 'with a suitcase and a big smile, as if they had always meant to come' }].concat(rest.map((q) => ({ ...q, from: NARRATORS[q.name].from })));
   const d = dayKey(clock.t);
   S.diary.push({ t: clock.t, d, k: 'first', a: b.name, text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
   S.diary.push({ t: clock.t + 1, d, k: 'first', a: b.name, text: NARRATORS[spec.name].sample });
+  // close in on them (without following), so they are big and easy to tap, clear of the hint at the bottom
+  follow = null; goHome = false; V.s = clamp(baseS * 3.2, 1.9, 2.4); V.cx = b.x; V.cy = b.floor * FH + 20 - (V.gy - V.vh * 0.5) / V.s; clampCam();
+  S.wakeUntil = clock.t + 3 * 60000;
   delete S.needsNarrator; S.diaryRead = clock.t + 1; S.hints = S.hints || {}; S.hints.movedAt = Date.now();
   save(); snd.play('whoosh');
   setTimeout(() => { showCard(`${b.name} moved in!`, [`${b.name} will keep the diary.`, 'Someone else is on the way, too.'], false); }, 1100);
