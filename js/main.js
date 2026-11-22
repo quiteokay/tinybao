@@ -1,6 +1,6 @@
 // Boot, the frame loop, the camera, and the visitor's hands.
 import { RW, FH, W, OUT, BAO, clamp, clock, dayKey, hourOf } from './core.js';
-import { newState, nFloors, weatherAt, adults, ext, minFloor, nextAdded } from './world.js';
+import { newState, nFloors, weatherAt, adults, ext, minFloor, nextAdded, roomsOf, STARTERS, NARRATORS } from './world.js';
 import { drawBaoShape } from './drawbao.js';
 import { R, init, tick, tickParts, settle, catchUp, petBao, pickUpBao, moveHeld, releaseBao, dropThing, pickUpThingByHand, releaseThing, notePhoto, ensureTray, initBao, dropBao, renameBao, plansInfo, choosePlan, furnAt, liftFurn, moveFurn, dropFurn } from './sim.js';
 import { render } from './draw.js';
@@ -15,7 +15,7 @@ import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 14; // keep in step with version.json
+const VERSION = 15; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
@@ -615,20 +615,84 @@ const shopApi = {
   },
 };
 // ---------- start ----------
+// ---------- a new community: choose who keeps the diary ----------
+function chooseNarrator() {
+  const pool = STARTERS.slice().sort(() => Math.random() - 0.5), two = pool.slice(0, 2);
+  const box = $('narrPick'); box.innerHTML = '';
+  for (const spec of two) {
+    const n = NARRATORS[spec.name], btn = document.createElement('button'); btn.className = 'narrOpt'; btn.setAttribute('aria-label', `Choose ${spec.name}`);
+    const cv = document.createElement('canvas'), dpr = Math.min(3, window.devicePixelRatio || 1); cv.width = 120 * dpr; cv.height = 104 * dpr; cv.style.width = '120px'; cv.style.height = '104px';
+    const c = cv.getContext('2d'); c.scale(dpr, dpr); c.translate(60, 96); c.scale(2, 2); drawBaoShape(c, { flavor: spec.flavor, acc: spec.acc, expr: 'joy' }, 0);
+    btn.appendChild(cv); btn.insertAdjacentHTML('beforeend', `<b>${esc(spec.name)}</b><span class="about">${esc(n.about)}</span><span class="sample">“${esc(n.sample)}”</span>`);
+    btn.addEventListener('click', () => pickNarrator(spec, two.find((q) => q !== spec)));
+    box.appendChild(btn);
+  }
+  $('narr').hidden = false; $('narr').dataset.at = performance.now();
+}
+function pickNarrator(spec, runnerUp) {
+  if (performance.now() - +$('narr').dataset.at < 450) return; // a late tap from the screen before
+  $('narr').hidden = true; snd.unlock(); music.resumeIfOn();
+  const k = roomsOf(S, 'kitchen')[0], x = k ? k.c * RW + RW / 2 : 100;
+  const b = { id: 'b' + Date.now().toString(36), name: spec.name, kind: 'adult', flavor: spec.flavor, acc: spec.acc, trait: spec.trait, x, floor: 0, arrived: clock.t,
+    needs: { hunger: 0.8, energy: 0.9, fun: 0.6, social: 0.7, clean: 0.9 } };
+  initBao(b); Object.assign(b, { alt: 160, fall: true, vy: 0 });
+  S.baos.push(b); S.everNames.push(b.name); S.diarist = b.id;
+  const rest = STARTERS.filter((q) => q !== spec && q !== runnerUp);
+  S.arrivals = [{ ...runnerUp, from: 'with a suitcase and a big smile, as if they had always meant to come' }].concat(rest.map((q) => ({ ...q, from: NARRATORS[q.name].from })));
+  const d = dayKey(clock.t);
+  S.diary.push({ t: clock.t, d, k: 'first', a: b.name, text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
+  S.diary.push({ t: clock.t + 1, d, k: 'first', a: b.name, text: NARRATORS[spec.name].sample });
+  delete S.needsNarrator; S.diaryRead = clock.t + 1; S.hints = S.hints || {}; S.hints.movedAt = Date.now();
+  save(); snd.play('whoosh');
+  setTimeout(() => { showCard(`${b.name} moved in!`, [`${b.name} will keep the diary.`, 'Someone else is on the way, too.'], false); }, 1100);
+}
+
+// ---------- hints for a new community: each one once, one at a time, only when nothing else is open ----------
+const overlayOpen = () => ['card', 'diary', 'settings', 'baoCard', 'plansCard', 'narr', 'photoView'].some((id) => $(id) && !$(id).hidden) || !!document.querySelector('.ws-door');
+let hintNow = null, hintSince = 0;
+const narr = () => S.baos.find((b) => b.id === S.diarist);
+const HINTS = [
+  { key: 'follow', when: () => S.hints.movedAt && Date.now() - S.hints.movedAt > 4000 && narr(),
+    text: () => `Tap ${narr().name} to follow them around.`, done: () => !!follow, max: 40 },
+  { key: 'drop', when: () => S.hints.follow || (S.hints.movedAt && Date.now() - S.hints.movedAt > 40000),
+    text: () => 'Drag one of today’s things into the house.', done: () => S.tray && S.tray.items.some((i) => i.used), max: 40 },
+  { key: 'diary', when: () => S.hints.follow && hasNews() && narr(),
+    text: () => `${narr().name} wrote something new. Tap the diary.`, done: () => !hasNews(), max: 30 },
+  { key: 'arrival', when: () => adults(S).length >= 2,
+    text: () => `${adults(S)[adults(S).length - 1].name} moved in! You can invite one new bao a day, too.`, done: () => false, max: 9 },
+  { key: 'choice', when: () => !!S.choice, text: () => 'The baos want your opinion on what to build next. Tap the sign at the top.', done: () => !S.choice, max: 14 },
+  { key: 'camera', when: () => (S.dayCount || 1) >= 2 && !(S.photos || []).length, text: () => 'Tap the camera to take a photo. It goes in the diary.', done: () => (S.photos || []).length > 0, max: 12 },
+];
+function hintTick() {
+  if (!S || !S.hints || S.needsNarrator) return;
+  if (armed >= 0) { hintNow = null; return; } // the tray is using the bubble
+  if (overlayOpen()) { if (hintNow) { setHint(''); hintNow = null; } return; }
+  if (hintNow) {
+    const h = HINTS.find((q) => q.key === hintNow);
+    if (h.done() || (Date.now() - hintSince) / 1000 > h.max) { S.hints[h.key] = true; hintNow = null; setHint(''); }
+    return;
+  }
+  const h = HINTS.find((q) => !S.hints[q.key] && q.when());
+  if (!h) return;
+  if (h.done()) { S.hints[h.key] = true; return; } // already worked it out
+  hintNow = h.key; hintSince = Date.now(); setHint(h.text());
+}
+
 function boot() {
   if (Q.has('speed')) clock.speed = clamp(+Q.get('speed') || 1, 0.1, 5000);
   if (WORKSHOP) { const g = shopClock(); clock.speed = g.speed || 1; }
   if (Q.has('hour')) { const want = +Q.get('hour'), d = new Date(); d.setHours(Math.floor(want), Math.round((want % 1) * 60), 0, 0); clock.t = d.getTime(); } else clock.t = Date.now();
   if (WORKSHOP) clock.t = Date.now() + (shopClock().offset || 0); // the test copy keeps its own clock
-  const loaded = load(); S = loaded || newState();
+  const loaded = load(); S = loaded || newState(Q.has('full') || WORKSHOP ? 'full' : 'tiny');
   const first = !loaded;
-  if (first) S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
+  if (first && !S.needsNarrator) S.diary.push({ t: clock.t, d: dayKey(clock.t), k: 'first', text: 'I have decided to keep a diary. Things happen in this house and somebody should write them down.' });
   init(S); if (S.diaryRead == null) S.diaryRead = clock.t; // older saves: nothing counts as new until something new is written
   R.sfx = (n) => { if (clock.speed <= 8) snd.play(n); }; R.onChange = (what, info) => { if (what === 'tray') { armed = -1; drawTray(); if (S.tray.day !== bootDay) snd.play('arrive'); } if (what === 'photo') takePhoto(info.x, info.f * FH + 40, true); if (what === 'plans' || what === 'grounds') { updatePlansChip(true); if (!$('plansCard').hidden) renderPlans(); } if (what === 'floor' || what === 'grounds') { if (what === 'floor' && S.basement && V.cy === 0 && !follow) V.cy = cyMin(); resize(); } };
   window.addEventListener('resize', resize); resize();
   let from = S.lastSeen || clock.t;
   if (Q.has('skipDays')) from = clock.t - (+Q.get('skipDays') || 1) * 86400000;
-  if (first) { settle();
+  if (S.needsNarrator) { settle(); chooseNarrator(); }
+  else if (first) { settle();
     showCard('The tiny bao community', ['They get on with things by themselves.', 'You can pet them, pick them up and put them somewhere else, and drop in today’s things to see what they make of them.'], false); }
   else if (clock.t - from > 150000) away(from, clock.t);
   else settle();
@@ -645,6 +709,7 @@ function boot() {
   archiveOld(); setInterval(archiveOld, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else last = performance.now(); });
   window.addEventListener('pagehide', save);
+  setInterval(hintTick, 1000);
   if (TEST) window.__bao = { S, R, clock, V, save, toScreen, toWorld, snd, music, VERSION, plansInfo, takePhoto, takeShot, getFull, cam: () => ({ follow: follow && follow.name, s: V.s, cx: V.cx, cy: V.cy, baseS, minS: minS() }) };
   requestAnimationFrame(frame);
 }

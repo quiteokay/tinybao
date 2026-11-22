@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/lilbao_351.png">
   <link rel="icon" type="image/png" href="/lilbao_351.png">
   <title>tiny bao</title>
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
   <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
@@ -46,6 +46,13 @@
     <div class="pvBar"><span id="pvWhen"></span><span class="pvBtns"><button id="pvDel">delete</button><button id="pvClose" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button></span></div>
   </div>
   <div id="hint" hidden></div>
+  <div id="narr" hidden>
+    <div class="bc narrCard" role="dialog" aria-labelledby="narrTitle">
+      <h2 id="narrTitle">Who should keep the diary?</h2>
+      <p class="narrSub">Every little house needs someone to write down what happens in it. Pick your narrator.</p>
+      <div class="narrPick" id="narrPick"></div>
+    </div>
+  </div>
 
   <div id="card" hidden>
     <h2 id="cardTitle"></h2>
@@ -94,6 +101,6 @@
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
   </div>
-  <script type="module" src="js/main.js?v=14"></script>
+  <script type="module" src="js/main.js?v=15"></script>
 </body>
 </html>

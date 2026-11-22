@@ -1,5 +1,5 @@
 {
-  "v": 14,
+  "v": 15,
   "files": [
     "index.html",
     "style.css",
@@ -21,6 +21,13 @@
     "fonts/PatrickHand-latin.woff2"
   ],
   "changes": [
+    {
+      "v": 15,
+      "notes": [
+        "the community now lives at tinybao.com",
+        "new communities start small: one tiny house, one flower, and a narrator you choose"
+      ]
+    },
     {
       "v": 14,
       "notes": [

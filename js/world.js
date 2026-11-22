@@ -114,13 +114,21 @@ export const adults = (S) => S.baos.filter((b) => b.kind !== 'baby');
 export const babyOf = (S) => S.baos.find((b) => b.kind === 'baby');
 
 // ---------- residents ----------
-const STARTERS = [
+export const STARTERS = [
   { name: 'Mochi',  flavor: 'plain',   acc: 'bow',     trait: 'tidy' },
   { name: 'Pim',    flavor: 'custard', acc: 'sprout',  trait: 'mischief' },
   { name: 'Nori',   flavor: 'matcha',  acc: 'cap',     trait: 'lazy' },
   { name: 'Sesame', flavor: 'sesame',  acc: 'glasses', trait: 'nosy' },
   { name: 'Taro',   flavor: 'taro',    acc: 'scarf',   trait: 'doting' },
 ];
+// For a new community the visitor picks one of the starters to keep the diary. The rest come along later.
+export const NARRATORS = {
+  Mochi:  { about: 'Mochi likes everything just so, and keeps the diary very neatly.', sample: 'Swept the kitchen. Then swept it again, properly.', from: 'with a broom, ready to tidy' },
+  Pim:    { about: 'Pim is usually up to something, and writes about it proudly.', sample: 'Nobody saw me do it. I am writing it down anyway.', from: 'and immediately hid somewhere' },
+  Nori:   { about: 'Nori would rather be napping, but notices more than you would think.', sample: 'Had a nap. Woke up. Considered another one.', from: 'and had a little lie down straight away' },
+  Sesame: { about: 'Sesame notices everything, and writes all of it down.', sample: 'There is a new crack in the ceiling. I have named it Gerald.', from: 'and had a good look round every room' },
+  Taro:   { about: 'Taro looks after everyone, and worries about them in the diary.', sample: 'Made soup for whoever comes next. Just in case.', from: 'with a casserole for everyone' },
+};
 const NEWCOMERS = [
   { name: 'Grandma Po', flavor: 'plain', acc: 'granny', trait: 'elder', kind: 'elder', from: 'from far away, with one very heavy suitcase' },
   { name: 'Biscuit', flavor: 'wheat',   acc: 'beanie', trait: 'sporty',  from: 'from the house down the hill' },
@@ -175,7 +183,7 @@ export function nextAdded(S) {
 }
 export function nextNewcomer(S) {
   const used = new Set(S.everNames);
-  return NEWCOMERS.find((n) => !used.has(n.name)) || null;
+  return (S.arrivals || []).find((n) => !used.has(n.name)) || NEWCOMERS.find((n) => !used.has(n.name)) || null;
 }
 export function addNewcomer(S, spec, walkingIn) {
   const b = makeBao(spec, walkingIn ? ext(S).L - 30 : rand(200, 340), 0);
@@ -184,7 +192,7 @@ export function addNewcomer(S, spec, walkingIn) {
   return b;
 }
 
-export function newState() {
+export function newState(cast = 'full') {
   const S = {
     v: 1, created: clock.t, lastSeen: clock.t, day: dayKey(clock.t), dayCount: 1,
     floors: [['kitchen', 'living', 'laundry'], ['bathroom', 'nursery', 'bedroom'], ['library', 'spare', 'bedroom']],
@@ -197,6 +205,13 @@ export function newState() {
     weather: null, tray: null, diary: [], diarist: null,
     fish: 1,
   };
+  if (cast === 'tiny') {
+    // a brand-new community: one floor of three rooms, one flower by the path, and nobody yet. The visitor picks who moves in first.
+    Object.assign(S, { floors: [['kitchen', 'bedroom', 'bathroom']], dishes: 0, bin: 0.1, outBin: 0, laundry: { basket: 0, machineEnd: 0, wet: false, line: 0, lineAt: 0 },
+      fire: { fuel: 0, logs: 0 }, fish: 0, queue: ['floor'].concat(ORDER), needsNarrator: true, hints: {} });
+    S.flowers.push({ x: -18, t: clock.t - 3 * 86400000, hue: 340, seen: true });
+    return S;
+  }
   const spots = [[60, 0], [300, 0], [470, 0], [250, 1], [90, 2]];
   STARTERS.forEach((sp, i) => { S.baos.push(makeBao(sp, spots[i][0], spots[i][1])); S.everNames.push(sp.name); });
   const baby = makeBao({ name: 'Pea', flavor: 'matcha', acc: 'curl', trait: 'baby', kind: 'baby' }, 240, 1);
