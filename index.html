@@ -1,397 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-title" content="tiny bao">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#70D4F1">
   <link rel="apple-touch-icon" href="/lilbao_351.png">
   <link rel="icon" type="image/png" href="/lilbao_351.png">
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>tiny bao ~°(＾◡＾)°~ </title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #70D4F1 0%, #87CEEB 50%, #98E4FF 100%);
-            padding: 40px 20px 20px 20px;
-            overflow: hidden;
-        }
-        
-        .bao-container {
-            position: relative;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-        }
-        
-        .bao-container:hover {
-            transform: scale(1.05);
-        }
-        
-        img {
-            width: 80%;
-            max-width: 400px;
-            height: auto;
-            display: block;
-            animation: float 3s ease-in-out infinite;
-            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
-            transition: all 0.3s ease;
-        }
-        
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0px) rotate(0deg);
-            }
-            50% {
-                transform: translateY(-15px) rotate(1deg);
-            }
-        }
-        
-        @keyframes bounce {
-            0%, 100% {
-                transform: translateY(0px) scale(1) rotate(0deg);
-            }
-            25% {
-                transform: translateY(-20px) scale(1.1) rotate(-2deg);
-            }
-            50% {
-                transform: translateY(-30px) scale(1.15) rotate(0deg);
-            }
-            75% {
-                transform: translateY(-10px) scale(1.05) rotate(2deg);
-            }
-        }
-        
-        @keyframes wiggle {
-            0%, 100% {
-                transform: rotate(0deg);
-            }
-            25% {
-                transform: rotate(-3deg) scale(1.02);
-            }
-            75% {
-                transform: rotate(3deg) scale(1.02);
-            }
-        }
-        
-        @keyframes sparkle {
-            0%, 100% {
-                opacity: 0;
-                transform: scale(0) rotate(0deg);
-            }
-            50% {
-                opacity: 1;
-                transform: scale(1) rotate(180deg);
-            }
-        }
-        
-        .bao-container.clicked img {
-            animation: bounce 0.8s ease-out;
-        }
-        
-        .bao-container.wiggling img {
-            animation: wiggle 0.5s ease-in-out;
-        }
-        
-        .sparkles {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-        }
-        
-        .sparkle {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: radial-gradient(circle, #FFD700 0%, #FFA500 100%);
-            border-radius: 50%;
-            opacity: 0;
-            animation: sparkle 1s ease-out;
-        }
-        
-        .sparkle:nth-child(1) {
-            top: -40px;
-            left: -30px;
-            animation-delay: 0s;
-        }
-        
-        .sparkle:nth-child(2) {
-            top: -30px;
-            right: -40px;
-            animation-delay: 0.1s;
-        }
-        
-        .sparkle:nth-child(3) {
-            bottom: -35px;
-            left: -25px;
-            animation-delay: 0.2s;
-        }
-        
-        .sparkle:nth-child(4) {
-            bottom: -40px;
-            right: -30px;
-            animation-delay: 0.15s;
-        }
-        
-        .sparkle:nth-child(5) {
-            top: -50px;
-            left: 50%;
-            transform: translateX(-50%);
-            animation-delay: 0.05s;
-        }
-        
-        .hearts {
-            position: absolute;
-            top: 10%;
-            left: 50%;
-            transform: translateX(-50%);
-            pointer-events: none;
-        }
-        
-        .heart {
-            position: absolute;
-            font-size: 24px;
-            color: #FF69B4;
-            opacity: 0;
-            animation: floatHeart 2s ease-out;
-        }
-        
-        @keyframes floatHeart {
-            0% {
-                opacity: 1;
-                transform: translateY(0px) scale(0.5);
-            }
-            50% {
-                opacity: 0.8;
-                transform: translateY(-40px) scale(1);
-            }
-            100% {
-                opacity: 0;
-                transform: translateY(-80px) scale(0.5);
-            }
-        }
-        
-        .heart:nth-child(1) {
-            left: -20px;
-            animation-delay: 0s;
-        }
-        
-        .heart:nth-child(2) {
-            left: 0px;
-            animation-delay: 0.3s;
-        }
-        
-        .heart:nth-child(3) {
-            left: 20px;
-            animation-delay: 0.6s;
-        }
-        
-        .message {
-            position: absolute;
-            top: -60px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.95);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-family: 'Comic Sans MS', cursive, sans-serif;
-            font-size: 14px;
-            color: #333;
-            border: 2px solid #FFB6C1;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            opacity: 0;
-            white-space: nowrap;
-            display: none;
-        }
-        
-        @keyframes showMessage {
-            0%, 100% {
-                opacity: 0;
-                transform: translateX(-50%) translateY(10px) scale(0.8);
-            }
-            20%, 80% {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0px) scale(1);
-            }
-        }
-        
-        .message::after {
-            content: '';
-            position: absolute;
-            bottom: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 8px solid #FFB6C1;
-        }
-        
-        .background-hearts {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: -1;
-        }
-        
-        .bg-heart {
-            position: absolute;
-            font-size: 20px;
-            color: rgba(255, 192, 203, 0.3);
-            animation: floatBgHeart 8s linear infinite;
-        }
-        
-        @keyframes floatBgHeart {
-            0% {
-                transform: translateY(100vh) rotate(0deg);
-                opacity: 0;
-            }
-            10% {
-                opacity: 1;
-            }
-            90% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(-100px) rotate(360deg);
-                opacity: 0;
-            }
-        }
-    </style>
+  <title>tiny bao</title>
+  <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
-    <div class="background-hearts" id="backgroundHearts"></div>
-    
-    <div class="bao-container" id="baoContainer">
-        <img src="lilbao_nobg.png" alt="tiny bao" id="baoImg">
-        <div class="sparkles" id="sparkles"></div>
-        <div class="hearts" id="hearts"></div>
-        <div class="message" id="message"></div>
+  <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
+  <button class="round" id="bSettings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24"><path d="M12 2.8l1.6 2.3 2.7-.7.6 2.7 2.7.6-.7 2.7 2.3 1.6-2.3 1.6.7 2.7-2.7.6-.6 2.7-2.7-.7L12 21.2l-1.6-2.3-2.7.7-.6-2.7-2.7-.6.7-2.7L2.8 12l2.3-1.6-.7-2.7 2.7-.6.6-2.7 2.7.7z" fill="#FFF3D6"/><circle cx="12" cy="12" r="3.4" fill="#BFE6F5"/></svg><i class="dot" aria-hidden="true"></i></button>
+  <div id="settings" hidden>
+    <div class="bc st">
+      <h2>Settings</h2>
+      <div class="st-row"><span>Music</span><button class="spk" id="swMusic" aria-pressed="true" aria-label="Turn music on"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M3.5 9.2h3.8l4.9-4v13.6l-4.9-4H3.5z"/><path class="on" d="M15.6 9.4a3.6 3.6 0 0 1 0 5.2M18.2 6.8a7.3 7.3 0 0 1 0 10.4"/><path class="off" d="M15.8 9.6l4.8 4.8M20.6 9.6l-4.8 4.8"/></svg></button><input type="range" class="vol" id="volMusic" min="0" max="100" step="1" aria-label="Music volume"></div>
+      <div class="st-row"><span>Sound effects</span><button class="spk" id="swSound" aria-pressed="false" aria-label="Mute sound effects"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M3.5 9.2h3.8l4.9-4v13.6l-4.9-4H3.5z"/><path class="on" d="M15.6 9.4a3.6 3.6 0 0 1 0 5.2M18.2 6.8a7.3 7.3 0 0 1 0 10.4"/><path class="off" d="M15.8 9.6l4.8 4.8M20.6 9.6l-4.8 4.8"/></svg></button><input type="range" class="vol" id="volSound" min="0" max="100" step="1" aria-label="Sound effects volume"></div>
+      <h3>Updates</h3>
+      <div class="st-row"><span id="stVersion"></span><button id="stUpdate">check for updates</button></div>
+      <h3>Your community</h3>
+      <p class="st-note">Every bao, the house, the photos and the diary live in this browser only. Save a copy to keep them safe or to move them to another device.</p>
+      <div class="st-btns"><button id="stExport">save a copy</button><button id="stImport">restore from a copy</button></div>
+      <div class="cardBtns"><button id="stDone">done</button></div>
     </div>
+  </div>
+  <button id="plans" aria-label="What the baos are building"></button>
+  <div id="plansCard" hidden><div class="bc pc" id="pcBody"></div></div>
+  <div id="tag" role="button" tabindex="0" hidden></div>
+  <div id="baoCard" hidden>
+    <div class="bc">
+      <canvas id="bcPic" width="160" height="140" aria-hidden="true"></canvas>
+      <h2 id="bcTitle"></h2>
+      <p id="bcAbout"></p>
+      <label class="bcName">Name <input id="bcName" maxlength="14" autocomplete="off" spellcheck="false"></label>
+      <div id="bcSwatches" role="radiogroup" aria-label="Colour"></div>
+      <p id="bcErr"></p>
+      <div class="cardBtns"><button id="bcCancel">not now</button><button id="bcOk">done</button></div>
+    </div>
+  </div>
+  <div id="photoView" hidden>
+    <img id="pvImg" alt="A photo of the community">
+    <div class="pvBar"><span id="pvWhen"></span><span class="pvBtns"><button id="pvDel">delete</button><button id="pvClose" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button></span></div>
+  </div>
+  <div id="hint" hidden></div>
 
-    <script>
-        const baoContainer = document.getElementById('baoContainer');
-        const baoImg = document.getElementById('baoImg');
-        const sparkles = document.getElementById('sparkles');
-        const hearts = document.getElementById('hearts');
-        const message = document.getElementById('message');
-        const backgroundHearts = document.getElementById('backgroundHearts');
-        
-        const cuteMessages = [
-            "（＾◡＾）♡",
-            "bao bao! ♡",
-            "so squishy~",
-            "uwu ♡",
-            "nom nom ♡",
-            "fluffy bao! ♡",
-            "steamy & cute ♡",
-            "ready to eat! ♡"
-        ];
-        
-        let clickCount = 0;
-        
-        // Create background floating hearts
-        function createBackgroundHeart() {
-            const heart = document.createElement('div');
-            heart.className = 'bg-heart';
-            heart.innerHTML = '♡';
-            heart.style.left = Math.random() * 100 + '%';
-            heart.style.animationDelay = Math.random() * 8 + 's';
-            heart.style.animationDuration = (Math.random() * 4 + 6) + 's';
-            backgroundHearts.appendChild(heart);
-            
-            setTimeout(() => {
-                heart.remove();
-            }, 10000);
-        }
-        
-        // Create background hearts periodically
-        setInterval(createBackgroundHeart, 2000);
-        
-        // Initial background hearts
-        for (let i = 0; i < 5; i++) {
-            setTimeout(createBackgroundHeart, i * 1000);
-        }
-        
-        baoContainer.addEventListener('click', function() {
-            clickCount++;
-            
-            // Remove existing animations
-            baoContainer.classList.remove('clicked', 'wiggling');
-            
-            // Add bounce animation
-            setTimeout(() => {
-                baoContainer.classList.add('clicked');
-            }, 10);
-            
-            // Create sparkles
-            sparkles.innerHTML = '';
-            for (let i = 0; i < 5; i++) {
-                const sparkle = document.createElement('div');
-                sparkle.className = 'sparkle';
-                sparkles.appendChild(sparkle);
-            }
-            
-            // Create floating hearts
-            hearts.innerHTML = '';
-            for (let i = 0; i < 3; i++) {
-                const heart = document.createElement('div');
-                heart.className = 'heart';
-                heart.innerHTML = '♡';
-                hearts.appendChild(heart);
-            }
-            
-            // Show cute message
-            const randomMessage = cuteMessages[Math.floor(Math.random() * cuteMessages.length)];
-            message.innerHTML = randomMessage;
-            message.style.display = 'block';
-            message.style.animation = 'none';
-            setTimeout(() => {
-                message.style.animation = 'showMessage 2s ease-out';
-            }, 10);
-            
-            // Special animation for multiple clicks
-            if (clickCount % 5 === 0) {
-                setTimeout(() => {
-                    baoContainer.classList.add('wiggling');
-                }, 500);
-            }
-            
-            // Clean up animations
-            setTimeout(() => {
-                baoContainer.classList.remove('clicked', 'wiggling');
-                sparkles.innerHTML = '';
-                hearts.innerHTML = '';
-                message.style.display = 'none';
-            }, 1000);
-        });
-        
-        // Add random wiggle occasionally
-        setInterval(() => {
-            if (Math.random() < 0.1) { // 10% chance every 3 seconds
-                baoContainer.classList.add('wiggling');
-                setTimeout(() => {
-                    baoContainer.classList.remove('wiggling');
-                }, 500);
-            }
-        }, 3000);
-    </script>
+  <div id="card" hidden>
+    <h2 id="cardTitle"></h2>
+    <div id="cardBody"></div>
+    <div class="cardBtns"><button id="cardDiary" hidden>read the diary</button><button id="cardOk">ok</button></div>
+  </div>
+
+  <div id="bar">
+    <button class="round" id="bDiary" title="Diary" aria-label="Open the diary"><i class="dot" aria-hidden="true"></i>
+      <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5" fill="#FFF3D6"/><path d="M5 3h3v18H5z" fill="#F2A65A"/><path d="M11 8h5M11 12h5M11 16h3"/><rect x="5" y="3" width="14" height="18" rx="2.5" fill="none"/></svg>
+    </button>
+    <div id="tray">
+      <div id="slots"></div>
+      <div id="trayNote">today’s things</div>
+    </div>
+    <div class="right">
+      <button class="round" id="bCam" title="Camera" aria-label="Take a photo">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="3" fill="#FFF3D6"/><path d="M8.5 7l1.5-2.5h4L15.5 7"/><circle cx="12" cy="13.5" r="3.6" fill="#BFE6F5"/><circle cx="17.6" cy="10" r=".9" fill="#E8604C" stroke="none"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="diary" hidden>
+    <div class="table" id="nbTable">
+      <svg class="prop stain" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="34" fill="none" stroke="#9A6542" stroke-width="5" opacity=".55"/></svg>
+      <svg class="prop pencil" viewBox="0 0 150 40" aria-hidden="true" fill="none" stroke="#3A2E2A" stroke-width="2.2" stroke-linejoin="round"><rect x="20" y="12" width="104" height="14" rx="2" fill="#F2C14E"/><path d="M124 12 L142 19 L124 26 Z" fill="#F1D9B5"/><path d="M137 17 L142 19 L137 21 Z" fill="#3A2E2A"/><rect x="6" y="12" width="14" height="14" rx="3" fill="#E58C9A"/></svg>
+      <div class="nb" id="nb">
+        <div class="rings" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet" id="nbSheet"></div>
+        <button class="ribbon" id="nbRibbon" aria-label="Back to today" title="Back to today"><i></i></button>
+      </div>
+      <div class="cover" id="nbCover" hidden>
+        <svg class="prop mug" viewBox="0 0 110 110" aria-hidden="true" fill="none" stroke="#3A2E2A" stroke-width="2.5"><circle cx="55" cy="55" r="40" fill="#E8DCCB"/><circle cx="55" cy="55" r="30" fill="#7A4A30"/><path d="M44 44 C 48 40, 54 40, 58 44" stroke="#F4EEE2" stroke-width="2" opacity=".6"/></svg>
+        <button class="closed" id="nbOpen" aria-label="Open the diary: there is a new page">
+          <span class="spine" aria-hidden="true"></span><span class="band" aria-hidden="true"></span>
+          <span class="label"><b id="nbCoverName">The diary</b><small>private!! (sort of)</small></span>
+          <svg class="coverBao" width="80" height="70" viewBox="0 0 80 70" aria-hidden="true" fill="none" stroke="#3A2E2A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 60 C 4 40, 18 22, 34 18 C 37 12, 43 12, 46 18 C 62 22, 76 40, 72 60 Z" fill="#FFF3DC"/><path d="M34 18 C 36 26, 44 26, 46 18" stroke-width="1.8"/><path d="M30 42 L32 42.4 M48 42 L50 42.4" stroke-width="3.4"/><path d="M36 48 C 38 51, 42 51, 44 48"/><circle cx="24" cy="48" r="4" fill="#F2A7A7" stroke="none"/><circle cx="56" cy="48" r="4" fill="#F2A7A7" stroke="none"/></svg>
+          <span class="sticky" aria-hidden="true">new<br>page!</span>
+          <span class="cribbon" aria-hidden="true"></span>
+        </button>
+        <p class="tapRead">tap to read</p>
+      </div>
+      <div class="picker" id="nbPicker" hidden><div class="pk" id="nbPick" role="dialog" aria-label="Choose a day"></div></div>
+      <p class="closeHint">tap the table to close</p>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </div>
+  </div>
+  <script type="module" src="js/main.js?v=14"></script>
 </body>
 </html>

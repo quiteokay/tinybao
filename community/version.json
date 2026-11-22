@@ -1,26 +1,13 @@
 {
-  "v": 14,
-  "files": [
-    "index.html",
-    "style.css",
-    "js/main.js",
-    "js/core.js",
-    "js/world.js",
-    "js/sim.js",
-    "js/diary.js",
-    "js/draw.js",
-    "js/drawbao.js",
-    "js/drawthings.js",
-    "js/drawsites.js",
-    "js/sound.js",
-    "js/music.js",
-    "js/photos.js",
-    "js/workshop.js",
-    "js/notebook.js",
-    "js/doodles.js",
-    "fonts/PatrickHand-latin.woff2"
-  ],
+  "v": 15,
+  "files": [],
   "changes": [
+    {
+      "v": 15,
+      "notes": [
+        "the community now lives at tinybao.com"
+      ]
+    },
     {
       "v": 14,
       "notes": [

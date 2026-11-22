@@ -1,0 +1,141 @@
+{
+  "v": 14,
+  "files": [
+    "index.html",
+    "style.css",
+    "js/main.js",
+    "js/core.js",
+    "js/world.js",
+    "js/sim.js",
+    "js/diary.js",
+    "js/draw.js",
+    "js/drawbao.js",
+    "js/drawthings.js",
+    "js/drawsites.js",
+    "js/sound.js",
+    "js/music.js",
+    "js/photos.js",
+    "js/workshop.js",
+    "js/notebook.js",
+    "js/doodles.js",
+    "fonts/PatrickHand-latin.woff2"
+  ],
+  "changes": [
+    {
+      "v": 14,
+      "notes": [
+        "basketballs drop through the hoop and net now, and about one shot in four bounces off the rim or the backboard"
+      ]
+    },
+    {
+      "v": 13,
+      "notes": [
+        "the diary is a little notebook on the table now, one day to a page, with doodles",
+        "the diary writer now writes about themselves properly (\"I keep\", not \"I keeps\"), old pages included"
+      ]
+    },
+    {
+      "v": 12,
+      "notes": [
+        "softer music, so every little sound (pets, page turns, ticks) comes through clearly",
+        "volume sliders and mute buttons for the music and sound effects in settings",
+        "the basketball court has its own basketball now: move it and two baos come out to play",
+        "tap a bao's name to rename or recolour them"
+      ]
+    },
+    {
+      "v": 11,
+      "notes": [
+        "one settings button for music, sounds, updates and saving a copy",
+        "jump to the first or the latest page of the diary"
+      ]
+    },
+    {
+      "v": 10,
+      "notes": [
+        "a gift box at the top shows when there is something new",
+        "names update everywhere as you type them",
+        "the diary closes with a swipe down"
+      ]
+    },
+    {
+      "v": 9,
+      "notes": [
+        "the diary is a proper little notebook now, with a cover and a ribbon",
+        "rain and snow fall more naturally, and the rain splashes"
+      ]
+    },
+    {
+      "v": 8,
+      "notes": [
+        "little fixes and tidying behind the scenes"
+      ]
+    },
+    {
+      "v": 7,
+      "notes": [
+        "a signboard shows what the baos are building and how many days to go",
+        "when they can't decide what to build next, you get to pick one of two",
+        "the close button on photos sits straight now",
+        "the diary keeps every day, and you can read all the way back to the first"
+      ]
+    },
+    {
+      "v": 6,
+      "notes": [
+        "meet each new bao before they move in, and give any bao a new name or colour",
+        "three new bun colours: peach, sky and mint",
+        "tap a bao once to follow it",
+        "move something and somebody comes to see",
+        "tap a photo in the diary to see it full size, or delete it",
+        "the camera snaps straight away, the whole screen",
+        "pull the diary down to close it"
+      ]
+    },
+    {
+      "v": 5,
+      "notes": [
+        "the baos really play with whatever you give them now",
+        "two things a day, plus one new bao",
+        "the zapper is gone; there is a camera instead",
+        "party poppers and bags of treats turn up now and then",
+        "the diary is a proper book you can turn the pages of",
+        "a little tune of their own, with its own button"
+      ]
+    },
+    {
+      "v": 4,
+      "notes": [
+        "you can add one new bao a day, next to today's things",
+        "somebody is always awake now, even at three in the morning",
+        "every floor has its own stairs and a ladder, inside the rooms"
+      ]
+    },
+    {
+      "v": 3,
+      "notes": [
+        "the baos never stop building now: a porch, a garden, courts, a bowling alley, even a lake",
+        "stairs! no more ladders between floors",
+        "the bathroom and one bedroom got a front wall and a big window",
+        "press and hold furniture to move it to any room",
+        "double-tap a bao to zoom in and follow it",
+        "new things arrive at midnight, with a countdown",
+        "this update button"
+      ]
+    },
+    {
+      "v": 2,
+      "notes": [
+        "added sound effects",
+        "the diary repeats itself less",
+        "baos hold still when you vaporize them"
+      ]
+    },
+    {
+      "v": 1,
+      "notes": [
+        "the tiny bao community opened its doors"
+      ]
+    }
+  ]
+}
