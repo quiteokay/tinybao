@@ -15,7 +15,7 @@ import { thingIcon } from './drawthings.js';
 import { THINGS } from './diary.js';
 import * as snd from './sound.js';
 
-const VERSION = 16; // keep in step with version.json
+const VERSION = 17; // keep in step with version.json
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const Q = new URLSearchParams(location.search);
@@ -279,7 +279,8 @@ function takeShot() {
   try { thumb = makeThumb(canvas, (cw - tw) / 2, Math.max(0, (sceneH - th) / 2), tw, th); full = makeFull(canvas); } catch (e) { return; }
   keepPhoto(thumb, full, fullCanvas.width, fullCanvas.height);
   R.flash = 1; snd.play('shutter');
-  const mid = toWorld(V.vw / 2, V.gy * 0.55); notePhoto(mid.x, clamp(Math.floor((mid.h + 6) / FH), S.basement ? -1 : 0, nFloors(S)), false);
+  const mid = toWorld(V.vw / 2, V.gy * 0.55), tl = toWorld(0, 0), br = toWorld(V.vw, Math.min(V.vh, V.gy + 20)); // the photo is the whole scene
+  notePhoto(mid.x, clamp(Math.floor((mid.h + 6) / FH), S.basement ? -1 : 0, nFloors(S)), false, { x0: tl.x, x1: br.x, h0: br.h, h1: tl.h });
   setHint('saved in the diary'); clearTimeout(setHint.t); setHint.t = setTimeout(() => { if (armed < 0) setHint(''); }, 1600);
   save();
 }
@@ -293,7 +294,7 @@ function takePhoto(x, h, auto) {
   let thumb, full; try { thumb = makeThumb(offCanvas, 0, 0, W2, H2); full = offCanvas.toDataURL('image/jpeg', 0.82); } catch (e) { return; }
   keepPhoto(thumb, full, W2, H2);
   if (!auto) { R.flash = 1; snd.play('shutter'); }
-  notePhoto(x, clamp(f, S.basement ? -1 : 0, nFloors(S)), auto); save();
+  notePhoto(x, clamp(f, S.basement ? -1 : 0, nFloors(S)), auto, { x0: x - W2 / 2 / s, x1: x + W2 / 2 / s, h0: centreH - H2 / 2 / s, h1: centreH + H2 / 2 / s }); save();
 }
 // Full-screen viewer, with delete.
 let viewing = null;
@@ -496,6 +497,7 @@ async function openDiary(day) {
 }
 function closeDiary() { opening++; $('diary').hidden = true; document.body.classList.remove('diaryOpen'); closeNotebook(); drawDiaryDot(); }
 attachNotebookInput($('nbSheet'));
+$('nbClose').addEventListener('click', () => closeDiary());
 $('nbOpen').addEventListener('click', () => { $('nbCover').hidden = true; $('nb').hidden = false; markRead(); snd.play('page'); });
 $('nbRibbon').addEventListener('click', () => { if (notebookDay() === dayKey(clock.t) || !goToday()) snd.play('blip'); });
 // tapping the table (anywhere but the notebook) closes it

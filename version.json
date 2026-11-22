@@ -1,5 +1,5 @@
 {
-  "v": 16,
+  "v": 17,
   "files": [
     "index.html",
     "style.css",
@@ -24,6 +24,13 @@
     "manifest.webmanifest"
   ],
   "changes": [
+    {
+      "v": 17,
+      "notes": [
+        "the diary only talks about the flashes now, and knows who was there",
+        "a \"close diary\" button"
+      ]
+    },
     {
       "v": 16,
       "notes": [

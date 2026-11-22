@@ -63,10 +63,7 @@ const T = {
     'We had a party {room} today. {a} says it started on its own, which is how the good ones start.'],
   treats: ['A bag of treats burst open {room}. Sweets everywhere! {a} got there first.', 'It rained treats {room}, more or less. We collected every single one.', 'A paper bag popped {room} and sweets went all over the floor. Nobody complained.'],
   treats_gone: ['{a} found the very last treat and ate it slowly, so everyone could watch.', 'All the treats are gone. {a} checked under the sofa twice.'],
-  photo_one: ['There was a bright flash {room} and {a} saw spots for a while. Afterwards, a little picture of {a} turned up on the wall.', 'A flash {room}! {a} blinked. There is a new photo on the wall now, and {a} looks lovely in it.'],
-  photo_two: ['A flash went off {room}, right while {a} and {b} were there. There is a picture of the two of them on the wall now.', '{a} and {b} got their picture taken {room}. Nobody is sure by whom.'],
-  photo_none: ['Something flashed {room}. Nobody was there. There is a picture of it on the wall now, which is a bit odd.'],
-  photo_party: ['Somebody got a picture of the party. It is on the wall now. {a} is mid-twirl.', 'The party photo came out well. {a} has a streamer on one ear.'],
+  photo_party: ['A flash went off in the middle of the party. {a} kept dancing, mid-twirl.', 'There was a flash during the party, just as {a} got a streamer stuck on one ear.'],
   welcome: ['{a} gave {b} a big welcome hug.', '{a} was the first to say hello to {b}.', '{a} showed {b} where the snacks are kept, which counts as a welcome here.'],
   teddy_give: ['{a} gave the teddy to {baby}. {baby} has not let go since.', '{a} found a teddy and took it straight to {baby}.'],
   choice_up: ['{a} pinned two ideas on the signboard: {w1}, or {w2}. There has been a lot of discussion.', 'Two drawings went up on the signboard: {w1} and {w2}. {a} keeps tapping one of them meaningfully.',
@@ -206,8 +203,6 @@ export function entryText(S, type, d = {}) {
     .replace(/like I\b/g, 'like me').replace(/asked I\b/g, 'asked me').replace(/find I\b/g, 'find me').replace(/expect I will/g, 'expect I will')
     .replace(/^I and ([A-Z]\w+(?: [A-Z]\w+)?) /, '$1 and I ').replace(/of I\b/g, 'of me').replace(/was I\./g, 'was me.').replace(/woke I\b/g, 'woke me').replace(/told I\b/g, 'told me').replace(/and I were/g, 'and I were');
   s = firstPerson(s);
-  const mine = (x) => x && typeof x === 'object' && x.id === me;
-  if (mine(d.a) || mine(d.b)) s = s.replace(/\btheir picture\b/g, 'our picture').replace(/the two of them/g, 'the two of us');
   return s;
 }
 
@@ -242,14 +237,19 @@ export function log(S, type, d = {}, opt = {}) {
 // ---------- photos: one entry a day that grows, so a run of snaps reads as one little story ----------
 const PHOTO_KINDS = ['photo_one', 'photo_two', 'photo_none', 'photos'];
 const NUMW = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-const MANY = {
-  2: ['Two flashes {room} today, one right after the other. {who} {were} in both pictures. They hang side by side on the wall now.',
-      'Flash, and then flash again {room}. {who} blinked twice. Two new pictures went up on the wall.'],
-  3: ['Three flashes today! {who} kept turning up in the pictures. The living-room wall is filling up.',
-      'Flash, flash, flash: three new pictures, and {who} in most of them.'],
-  many: ['{N} flashes today. {who} {have} started striking a pose whenever a light goes off. The living-room wall is mostly pictures now.',
-         'It was a very flashy day: {n} new pictures. {who} {were} in a lot of them, mostly blinking.'],
-  none: ['{N} flashes today, and nobody in any of the pictures. Just the rooms, very still. We have hung them up anyway.'],
+// The baos never know a photo was taken: they only notice the flash.
+const FLASH = {
+  one: ['There was a bright flash {room} and {who} saw spots for a while.', 'A flash {room}! {who} blinked, then pretended nothing had happened.',
+    'Something went flash {room} while {who} {were} there. Indoor lightning, apparently.', 'For a moment everything {room} went bright. {who} says it felt like being noticed.',
+    '{who} {were} {room} when a little sparkle went off. {who} waved at it, just in case.'],
+  some: ['A flash went off {room}, right while {who} were there. Everyone saw spots.', '{who} were {room} when everything went bright for a blink. Nobody knows why, and nobody minds.',
+    'Flash! {who} jumped, then laughed about it.'],
+  none: ['There was a bright flash {room} today. Nobody can say where it came from.', 'The light {room} went funny for a moment, like a tiny bit of lightning. Then everything was normal again.'],
+  2: ['Two flashes {room} today, one right after the other. {who} blinked twice.', 'Flash, and then flash again {room}. {who} {have} started to wonder about it.'],
+  3: ['Three flashes today! {who} kept being right where they happened.', 'Flash, flash, flash. {who} {were} there for most of them, blinking.'],
+  many: ['{N} flashes today. {who} {have} started striking a pose whenever a light goes off.', 'It was a very flashy day: {n} bright blinks. {who} {were} in the middle of most of them.',
+    '{N} little flashes today. {who} {have} decided they are good luck.'],
+  manyNone: ['{N} flashes today, {room}. Nobody can work out where they come from.', '{N} bright little flashes today, {room}. We have started calling them sparkles.'],
 };
 function listNames(S, names) {
   const me = S.baos.find((b) => b.id === S.diarist), others = [...new Set(names)].filter((n) => !me || n !== me.name);
@@ -257,23 +257,25 @@ function listNames(S, names) {
   if (!list.length) return null;
   return { text: list.length === 1 ? list[0] : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1], one: list.length === 1 && list[0] !== 'I', me: list.length === 1 && list[0] === 'I' };
 }
-function photosText(S, e) {
-  const who = listNames(S, e.who || []), n = e.n, seed = [...e.d].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const set = !who ? MANY.none : n === 2 ? MANY[2] : n === 3 ? MANY[3] : MANY.many, tpl = set[seed % set.length];
+// Every photo entry is written from what is stored on it (who was there, how many flashes, where), the same way each time.
+function photoText(S, e) {
+  const who = listNames(S, e.who || []), n = e.n || 1, seed = [...e.d].reduce((a, c) => a + c.charCodeAt(0), 0) + (e.who || []).length;
+  const set = n === 1 ? (!who ? FLASH.none : who.one || who.me ? FLASH.one : FLASH.some) : !who ? FLASH.manyNone : n === 2 ? FLASH[2] : n === 3 ? FLASH[3] : FLASH.many;
   const room = e.rooms && e.rooms.length === 1 ? e.rooms[0] : 'around the house';
-  return tpl.replace('{room}', room).replace('{N}', (NUMW[n] || String(n)).replace(/^./, (c) => c.toUpperCase())).replace('{n}', NUMW[n] || String(n))
-    .replace('{who}', who ? who.text : '').replace('{were}', who && (who.one || who.me) ? 'was' : 'were').replace('{have}', who && who.one ? 'has' : 'have');
+  const s = set[seed % set.length].replace(/\{room\}/g, room).replace('{N}', (NUMW[n] || String(n)).replace(/^./, (c) => c.toUpperCase())).replace('{n}', NUMW[n] || String(n))
+    .replace(/\{who\}/g, who ? who.text : '').replace(/\{were\}/g, who && (who.one || who.me) ? 'was' : 'were').replace(/\{have\}/g, who && who.one ? 'has' : 'have');
+  return firstPerson(s.replace(/^./, (c) => c.toUpperCase()));
 }
 export function logPhoto(S, inShot, room) {
   const day = dayKey(clock.t), names = inShot.map((b) => b.name);
   const prev = S.diary.slice().reverse().find((e) => e.d === day && PHOTO_KINDS.includes(e.k));
   if (!prev) {
-    const e = log(S, inShot.length > 1 ? 'photo_two' : inShot.length ? 'photo_one' : 'photo_none', { a: inShot[0] || null, b: inShot[1] || null, room }, { important: true });
-    if (e) { e.who = names; e.rooms = [room]; e.n = 1; }
+    const e = log(S, 'photos', { a: inShot[0] || null }, { important: true });
+    if (e) { e.who = names; e.rooms = [room]; e.n = 1; e.text = photoText(S, e); }
     return e;
   }
   prev.n = (prev.n || 1) + 1; prev.who = [...new Set([...(prev.who || []), ...names])]; prev.rooms = [...new Set([...(prev.rooms || []), room])];
-  prev.k = 'photos'; prev.text = photosText(S, prev);
+  prev.k = 'photos'; prev.text = photoText(S, prev);
   return prev;
 }
 // Tidy older diaries: several photo entries on one day become one; exact repeats on a day go.
@@ -285,11 +287,16 @@ export function compactDiary(S) {
       const found = names.filter((n) => new RegExp('(^|[^\\p{L}])' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}])', 'u').test(e.text));
       const f = firstPhoto[e.d];
       if (!f) { firstPhoto[e.d] = e; e.who = e.who || found; e.rooms = e.rooms || []; e.n = e.n || 1; keep.push(e); continue; }
-      f.n = (f.n || 1) + (e.n || 1); f.who = [...new Set([...(f.who || []), ...(e.who || found)])]; f.rooms = [...new Set([...(f.rooms || []), ...(e.rooms || [])])]; f.k = 'photos'; f.text = photosText(S, f);
+      f.n = (f.n || 1) + (e.n || 1); f.who = [...new Set([...(f.who || []), ...(e.who || found)])]; f.rooms = [...new Set([...(f.rooms || []), ...(e.rooms || [])])]; f.k = 'photos';
       continue;
     }
     const key = e.d + '|' + e.text; if (seenText.has(key)) continue; seenText.add(key);
     keep.push(e);
   }
   S.diary.length = 0; S.diary.push(...keep);
+  // photo entries in the newer voice: the baos only ever saw flashes
+  for (const e of S.diary) {
+    if (PHOTO_KINDS.includes(e.k) && e.n) { e.k = 'photos'; e.text = photoText(S, e); }
+    else if (e.k === 'photo_party' && /picture|photo/i.test(e.text)) e.text = /twirl/.test(e.text) ? e.text.replace(/^.*?\.\s*It is on the wall now\.\s*/, 'A flash went off in the middle of the party. ').replace(/is mid-twirl/, 'kept dancing, mid-twirl') : e.text.replace(/^The party photo came out well\.\s*/, 'There was a flash during the party. ');
+  }
 }

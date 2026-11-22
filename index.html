@@ -11,7 +11,7 @@
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
   <link rel="manifest" href="manifest.webmanifest">
   <title>tiny bao</title>
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
   <canvas id="c" aria-label="A building full of tiny baos going about their day"></canvas>
@@ -98,11 +98,11 @@
         <p class="tapRead">tap to read</p>
       </div>
       <div class="picker" id="nbPicker" hidden><div class="pk" id="nbPick" role="dialog" aria-label="Choose a day"></div></div>
-      <p class="closeHint">tap the table to close</p>
+      <button class="closeHint" id="nbClose">close diary</button>
     </div>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
   </div>
-  <script type="module" src="js/main.js?v=16"></script>
+  <script type="module" src="js/main.js?v=17"></script>
 </body>
 </html>

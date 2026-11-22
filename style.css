@@ -181,7 +181,7 @@ body.diaryOpen #plans, body.diaryOpen #bSettings { z-index: 41; }
 .table { position: absolute; left: 0; right: 0; bottom: 0; top: calc(max(12px, env(safe-area-inset-top)) + 58px); overflow: hidden;
   background: repeating-linear-gradient(to bottom, #B47E58 0 116px, #A26E4B 116px 119px); border-top: 3px solid #3A2E2A; box-shadow: 0 -6px 18px rgba(0,0,0,.25); animation: tableIn .25s ease-out; }
 @keyframes tableIn { from { transform: translateY(36px); opacity: 0; } }
-.closeHint { position: absolute; left: 0; right: 0; bottom: calc(8px + env(safe-area-inset-bottom)); margin: 0; text-align: center; font-size: 13px; font-weight: 700; color: #F6E7D6; pointer-events: none; }
+.closeHint { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(4px + env(safe-area-inset-bottom)); margin: 0; padding: 8px 18px; min-height: 40px; background: none; border: none; font: inherit; font-size: 14px; font-weight: 800; color: #F6E7D6; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(246,231,214,.5); text-underline-offset: 4px; z-index: 5; }
 .prop { position: absolute; pointer-events: none; }
 .prop.stain { width: 120px; right: -10px; bottom: 20px; }
 .prop.pencil { width: 120px; left: -26px; bottom: 30px; transform: rotate(-24deg); }

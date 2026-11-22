@@ -1012,11 +1012,14 @@ function burstTreats(S, o) {
   for (const b of freeAdults(S).sort((p, q) => near(p, o) - near(q, o)).slice(0, 6)) { abort(b); b.hurry = 1.6; say(b, 'ex', 1); }
   log(S, 'treats', { a: freeAdults(S)[0] || null, room: whereIs(S, x, f) }, { important: true });
 }
-// The visitor took a photo: note who was in it.
-export function notePhoto(x, f, auto) {
-  const S = R.S, inShot = S.baos.filter((b) => b.floor === f && Math.abs(b.x - x) < 110 && b.kind !== 'baby');
-  if (auto) log(S, 'photo_party', { a: inShot[0] || null, room: whereIs(S, x, f) }, { important: true });
-  else logPhoto(S, inShot, whereIs(S, x, f)); // one entry a day, rewritten as more photos are taken
+// The visitor took a photo: note who was in it. area is the part of the world the photo shows.
+export function notePhoto(x, f, auto, area) {
+  const S = R.S, a = area || { x0: x - 110, x1: x + 110, h0: f * FH - 10, h1: (f + 1) * FH };
+  const inShot = S.baos.filter((b) => b.kind !== 'baby' && !b.held && b.x >= a.x0 - 10 && b.x <= a.x1 + 10 && hOf(b) >= a.h0 - 30 && hOf(b) <= a.h1);
+  const rooms = [...new Set(inShot.map((b) => whereIs(S, b.x, b.floor)))];
+  const room = rooms.length === 1 ? rooms[0] : rooms.length ? 'around the house' : whereIs(S, x, f);
+  if (auto) log(S, 'photo_party', { a: inShot[0] || null, room }, { important: true });
+  else logPhoto(S, inShot, room); // one entry a day, rewritten as more photos are taken
   for (const q of inShot) { q.blink = 0.4; say(q, 'star', 1.5); }
 }
 
